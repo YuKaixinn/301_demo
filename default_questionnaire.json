@@ -1,0 +1,99 @@
+{ 
+  "questionnaire_id": "skill_training_motivation_v1", 
+  "title": "技能训练动机问卷", 
+  "language": "zh-CN", 
+  "response_scale": { 
+    "type": "likert", 
+    "min": 1, 
+    "max": 5, 
+    "labels": { 
+      "1": "一点也不对", 
+      "2": "不太对", 
+      "3": "适中", 
+      "4": "较对", 
+      "5": "非常对" 
+    } 
+  }, 
+  "items": [
+    { "id": 1, "text": "我进行技能训练主要是因为我喜欢这个过程", "reverse_scored": false }, 
+    { "id": 2, "text": "我觉得技能训练与我的人生目标和发展规划是一致的", "reverse_scored": false }, 
+    { "id": 3, "text": "我认为技能训练有助于实现我认同的重要价值", "reverse_scored": false }, 
+    { "id": 4, "text": "如果停止技能训练我会感到内疚或不安", "reverse_scored": false }, 
+    { "id": 5, "text": "我进行技能训练主要是为了获得奖励或避免惩罚", "reverse_scored": false }, 
+    { "id": 6, "text": "即使不进行技能训练我也觉得无所谓", "reverse_scored": false }, 
+    { "id": 7, "text": "我容易感到紧张和担心", "reverse_scored": false }, 
+    { "id": 8, "text": "我做事之前通常会提前计划并按时完成", "reverse_scored": false }, 
+    { "id": 9, "text": "我愿意体谅他人并保持合作的态度", "reverse_scored": false }, 
+    { "id": 10, "text": "我喜欢尝试新鲜事物并对新观点保持好奇", "reverse_scored": false }, 
+    { "id": 11, "text": "我在集体活动中通常比较活跃并乐于发言", "reverse_scored": false }, 
+    { "id": 12, "text": "面对挫折时我能够坚持下去直到问题解决", "reverse_scored": false }, 
+    { "id": 13, "text": "面对困难任务时我相信自己有能力做好", "reverse_scored": false }, 
+    { "id": 14, "text": "在困难情境下我仍能看到积极的一面", "reverse_scored": false }, 
+    { "id": 15, "text": "我愿意主动争取更高更有挑战性的目标", "reverse_scored": false }, 
+    { "id": 16, "text": "即使没有人要求我也会主动开始准备工作", "reverse_scored": false }, 
+    { "id": 17, "text": "我希望把任务做到尽可能完善并注意细节", "reverse_scored": false }, 
+    { "id": 18, "text": "为了团队或集体目标我愿意付出额外的时间和精力", "reverse_scored": false }, 
+    { "id": 19, "text": "我对当前的学习或工作感到投入并充满活力", "reverse_scored": false }, 
+    { "id": 20, "text": "我愿意利用空闲时间主动学习以提升自己", "reverse_scored": false } 
+  ], 
+  "scoring": { 
+    "notes": [ 
+      "每题正向计分：选择的数值即为得分；分量表得分为对应题目得分相加。" 
+    ], 
+    "subscales": [ 
+      { "id": "intrinsic_motivation", "name": "内部动机", "item_ids": [1], "aggregation": "sum" }, 
+      { "id": "integrated_regulation", "name": "整合调节", "item_ids": [2], "aggregation": "sum" }, 
+      { "id": "identified_regulation", "name": "认同调节", "item_ids": [3], "aggregation": "sum" }, 
+      { "id": "introjected_regulation", "name": "内摄调节", "item_ids": [4], "aggregation": "sum" }, 
+      { "id": "external_regulation", "name": "外在调节", "item_ids": [5], "aggregation": "sum" }, 
+      { "id": "amotivation", "name": "无动机", "item_ids": [6], "aggregation": "sum" }, 
+      { "id": "neuroticism", "name": "神经质", "item_ids": [7], "aggregation": "sum" }, 
+      { "id": "conscientiousness", "name": "尽责性", "item_ids": [8], "aggregation": "sum" }, 
+      { "id": "agreeableness", "name": "宜人性", "item_ids": [9], "aggregation": "sum" }, 
+      { "id": "openness", "name": "开放性", "item_ids": [10], "aggregation": "sum" }, 
+      { "id": "extraversion", "name": "外向性", "item_ids": [11], "aggregation": "sum" }, 
+      { "id": "tenacity", "name": "坚韧", "item_ids": [12], "aggregation": "sum" }, 
+      { "id": "strength", "name": "力量", "item_ids": [13], "aggregation": "sum" }, 
+      { "id": "optimism", "name": "乐观", "item_ids": [14], "aggregation": "sum" }, 
+      { "id": "aggressiveness", "name": "进取", "item_ids": [15], "aggregation": "sum" }, 
+      { "id": "initiative", "name": "主动", "item_ids": [16], "aggregation": "sum" }, 
+      { "id": "perfectionism", "name": "求精", "item_ids": [17], "aggregation": "sum" }, 
+      { "id": "dedication", "name": "奉献", "item_ids": [18], "aggregation": "sum" }, 
+      { "id": "work_engagement", "name": "乐业", "item_ids": [19], "aggregation": "sum" }, 
+      { "id": "lifelong_learning", "name": "持续学习", "item_ids": [20], "aggregation": "sum" } 
+    ], 
+    "composites": [ 
+      { 
+        "id": "self_determined_motivation", 
+        "name": "自主动机", 
+        "formula": "3*内部动机 + 2*整合动机 + 认同动机 - 内摄调节 - 2*外在调节 - 3*无动机", 
+        "weights": { 
+          "intrinsic_motivation": 3, 
+          "integrated_regulation": 2, 
+          "identified_regulation": 1, 
+          "introjected_regulation": -1, 
+          "external_regulation": -2, 
+          "amotivation": -3 
+        } 
+      }, 
+      { 
+        "id": "psychological_capital_total", 
+        "name": "心理弹性总分", 
+        "weights": { 
+          "tenacity": 1, 
+          "strength": 1, 
+          "optimism": 1, 
+          "aggressiveness": 1, 
+          "initiative": 1, 
+          "perfectionism": 1, 
+          "dedication": 1, 
+          "work_engagement": 1, 
+          "lifelong_learning": 1 
+        } 
+      } 
+    ] 
+  }, 
+  "reference": { 
+    "citation_text": "大学生锻炼行为与基本心理需要、自主动机及自我效能的关系_樊雯" 
+  } 
+}

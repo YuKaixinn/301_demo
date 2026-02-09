@@ -1,0 +1,45 @@
+{
+  "name": "my-electron-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/&& set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/&& electron-builder --dir",
+    "dist": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/&& set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/&& electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "build": {
+    "appId": "com.mycompany.my-electron-app",
+    "productName": "my-electron-app",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "dependencies": {
+    "echarts": "^6.0.0"
+  },
+  "devDependencies": {
+    "electron": "^23.3.13",
+    "electron-builder": "^25.1.8"
+  }
+}
