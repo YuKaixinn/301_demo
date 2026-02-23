@@ -27,17 +27,18 @@ contextBridge.exposeInMainWorld('api', {
   listCognitiveRecords: (limit) => ipcRenderer.invoke('cognitive:listRecords', limit),
   importCognitivePdf: () => ipcRenderer.invoke('cognitive:importPdf'),
 
-  // Game Score API
   analyzeGameScore: (subjectId) => ipcRenderer.invoke('game:analyze', subjectId),
   analyzeGameFile: (type, filePath) => ipcRenderer.invoke('game:analyzeFile', type, filePath),
   saveGameScore: (data) => ipcRenderer.invoke('game:save', data),
   listGameScores: (limit) => ipcRenderer.invoke('game:listHistory', limit),
-  
-  // Module API
+  predictEleLevel: (subjectId) => ipcRenderer.invoke('ele:predictLevel', subjectId),
+  predictCogType: (subjectId) => ipcRenderer.invoke('cog:predictType', subjectId),
+  predictMotivationType: (subjectId) => ipcRenderer.invoke('mot:predictType', subjectId),
+  predictMotivationLevel: (subjectId) => ipcRenderer.invoke('mot:predictLevel', subjectId),
+
   launchSoftware: (module, subjectId) => ipcRenderer.invoke('launch-software', module, subjectId),
   killAllProcesses: () => ipcRenderer.invoke('process:killAll'),
 
-  // Window Controls
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   maximizeWindow: () => ipcRenderer.send('window:maximize'),
   closeWindow: () => ipcRenderer.send('window:close')
