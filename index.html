@@ -24,6 +24,9 @@
       <li class="nav-item" data-page="settings">
         <span>⚙️</span> 系统设置
       </li>
+      <li class="nav-item" data-page="model">
+        <span>🤖</span> 模型预测
+      </li>
     </ul>
   </nav>
 
@@ -319,6 +322,78 @@
           <div id="game-list" class="modern-card" style="display: none; margin-top: 24px; box-shadow: none; border: 1px solid #e2e8f0;">
             <h3 style="margin-bottom: 16px; font-size: 18px; color: #333;">历史记录</h3>
             <div id="game-list-content" style="font-size:14px;color:#374151;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Prediction Page -->
+      <div id="page-model" class="page">
+        <div class="modern-card">
+          <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">模型预测（Ele_Level）</h3>
+          <p style="color:#64748b; margin-bottom:16px; font-size:14px;">
+            基于线下训练好的 Ele_Level 高AUC模型，根据当前被试的多模态数据进行在线预测。
+          </p>
+
+          <div style="display:flex; gap:12px; align-items:center; margin-bottom:20px;">
+            <input type="text" id="prediction-subject-id" placeholder="被试编号，例如 24380101"
+                   class="modern-input" style="max-width:240px;">
+            <button id="run-prediction-btn" class="modern-btn btn-primary">🚀 运行 Ele_Level 预测</button>
+          </div>
+
+          <div id="prediction-result" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            <h4 style="margin:0 0 12px 0; color:#374151;">预测结果</h4>
+            <p id="prediction-output" style="font-size:14px; color:#111827;"></p>
+            <p id="prediction-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+            <p id="prediction-note" style="font-size:12px; color:#6b7280; margin-top:12px;">
+              当前模型基于 Ele_Level_Custom_Weighted_Optimized_Extreme_1515_best_model.pkl（AUC≈0.80），结合问卷、生理、游戏等多模态指标进行预测。
+            </p>
+          </div>
+        </div>
+
+        <div class="modern-card" style="margin-top:24px;">
+          <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">模型预测（认知优势类型 Cog_Type）</h3>
+          <p style="color:#64748b; margin-bottom:16px; font-size:14px;">
+            使用 HybridOvRClassifier（记忆强 / 执行强 / 推理强），基于线下训练好的 Cog_Type_HybridOvR_best_model.pkl，对当前被试的认知优势类型进行预测。
+          </p>
+
+          <div style="display:flex; gap:12px; align-items:center; margin-bottom:20px;">
+            <input type="text" id="cog-prediction-subject-id" placeholder="被试编号，例如 24380101"
+                   class="modern-input" style="max-width:240px;">
+            <button id="run-cog-prediction-btn" class="modern-btn btn-primary">🧠 预测认知优势类型</button>
+          </div>
+
+          <div id="cog-prediction-result" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            <h4 style="margin:0 0 12px 0; color:#374151;">认知优势预测结果</h4>
+            <p id="cog-prediction-output" style="font-size:14px; color:#111827;"></p>
+            <p id="cog-prediction-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+          </div>
+        </div>
+
+        <div class="modern-card" style="margin-top:24px;">
+          <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">模型预测（动机类型与水平）</h3>
+          <p style="color:#64748b; margin-bottom:16px; font-size:14px;">
+            基于 Motivation_Type_Classification_best_model.pkl 和 Motivation_Level_Extreme_4040_best_model.pkl，
+            结合问卷、生理与游戏行为特征，对当前被试的动机类型与自主动机水平进行预测。
+          </p>
+
+          <div style="display:flex; gap:12px; align-items:center; margin-bottom:20px;">
+            <input type="text" id="mot-prediction-subject-id" placeholder="被试编号，例如 24380101"
+                   class="modern-input" style="max-width:240px;">
+            <button id="run-mot-type-btn" class="modern-btn btn-primary">🔥 预测动机类型</button>
+            <button id="run-mot-level-btn" class="modern-btn btn-secondary">📈 预测动机水平</button>
+          </div>
+
+          <div id="mot-type-result" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            <h4 style="margin:0 0 12px 0; color:#374151;">动机类型预测结果</h4>
+            <p id="mot-type-output" style="font-size:14px; color:#111827;"></p>
+            <p id="mot-type-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+          </div>
+
+          <div id="mot-level-result" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            <h4 style="margin:0 0 12px 0; color:#374151;">自主动机水平预测结果</h4>
+            <p id="mot-level-output" style="font-size:14px; color:#111827;"></p>
+            <p id="mot-level-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+            <p id="mot-level-score" style="font-size:13px; color:#4b5563; margin-top:4px;"></p>
           </div>
         </div>
       </div>

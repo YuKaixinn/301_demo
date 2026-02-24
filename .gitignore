@@ -1,0 +1,20 @@
+# --- 文件夹 ---
+node_modules/
+.vscode/          # 如果你用 VS Code
+.idea/            # 如果你用 PyCharm
+dist/
+build/
+
+# --- Python & AI (深度学习常用) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pth             # 权重文件
+*.ckpt            # 检查点
+*.h5
+.ipynb_checkpoints/
+
+# --- Windows 特有 ---
+Thumbs.db
+desktop.ini
+

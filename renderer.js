@@ -1152,3 +1152,147 @@ configBindings.forEach(cfg => {
         };
     }
 });
+
+const runPredictionBtn = document.getElementById('run-prediction-btn');
+if (runPredictionBtn) {
+    runPredictionBtn.onclick = async () => {
+        const idInput = document.getElementById('prediction-subject-id');
+        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
+        const subjectId = manualId || getGlobalSubjectId();
+        if (!subjectId) {
+            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+        }
+
+        const resultBox = document.getElementById('prediction-result');
+        const outputEl = document.getElementById('prediction-output');
+        const probEl = document.getElementById('prediction-prob');
+
+        await withLoading(runPredictionBtn, async () => {
+            const res = await window.api.predictEleLevel(subjectId);
+            if (!res || !res.ok) {
+                const msg = res && res.error ? res.error : '预测失败';
+                if (resultBox) resultBox.style.display = 'none';
+                return showModal('预测失败: ' + msg);
+            }
+
+            if (resultBox) resultBox.style.display = 'block';
+            if (outputEl) {
+                outputEl.innerText = `预测等级：${res.label_text || '未知'}（分类标签 = ${res.label}）`;
+            }
+            if (probEl && typeof res.prob_high === 'number') {
+                probEl.innerText = `模型输出为「高水平」的概率：${(res.prob_high * 100).toFixed(1)}%`;
+            }
+        });
+    };
+}
+
+const runCogPredictionBtn = document.getElementById('run-cog-prediction-btn');
+if (runCogPredictionBtn) {
+    runCogPredictionBtn.onclick = async () => {
+        const idInput = document.getElementById('cog-prediction-subject-id');
+        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
+        const subjectId = manualId || getGlobalSubjectId();
+        if (!subjectId) {
+            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+        }
+
+        const resultBox = document.getElementById('cog-prediction-result');
+        const outputEl = document.getElementById('cog-prediction-output');
+        const probEl = document.getElementById('cog-prediction-prob');
+
+        await withLoading(runCogPredictionBtn, async () => {
+            const res = await window.api.predictCogType(subjectId);
+            if (!res || !res.ok) {
+                const msg = res && res.error ? res.error : '预测失败';
+                if (resultBox) resultBox.style.display = 'none';
+                return showModal('预测失败: ' + msg);
+            }
+
+            if (resultBox) resultBox.style.display = 'block';
+            if (outputEl) {
+                outputEl.innerText = `认知优势类型：${res.label_text || res.label || '未知'}`;
+            }
+            if (probEl && res.probs) {
+                const parts = Object.keys(res.probs).map(k => {
+                    const v = res.probs[k];
+                    return `${k}: ${(v * 100).toFixed(1)}%`;
+                });
+                probEl.innerText = `各类型概率：${parts.join('， ')}`;
+            }
+        });
+    };
+}
+
+const runMotTypeBtn = document.getElementById('run-mot-type-btn');
+if (runMotTypeBtn) {
+    runMotTypeBtn.onclick = async () => {
+        const idInput = document.getElementById('mot-prediction-subject-id');
+        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
+        const subjectId = manualId || getGlobalSubjectId();
+        if (!subjectId) {
+            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+        }
+
+        const resultBox = document.getElementById('mot-type-result');
+        const outputEl = document.getElementById('mot-type-output');
+        const probEl = document.getElementById('mot-type-prob');
+
+        await withLoading(runMotTypeBtn, async () => {
+            const res = await window.api.predictMotivationType(subjectId);
+            if (!res || !res.ok) {
+                const msg = res && res.error ? res.error : '预测失败';
+                if (resultBox) resultBox.style.display = 'none';
+                return showModal('预测失败: ' + msg);
+            }
+
+            if (resultBox) resultBox.style.display = 'block';
+            if (outputEl) {
+                outputEl.innerText = `动机类型：${res.label_text || res.label || '未知'}`;
+            }
+            if (probEl && res.probs) {
+                const parts = Object.keys(res.probs).map(k => {
+                    const v = res.probs[k];
+                    return `${k}: ${(v * 100).toFixed(1)}%`;
+                });
+                probEl.innerText = `各类型概率：${parts.join('， ')}`;
+            }
+        });
+    };
+}
+
+const runMotLevelBtn = document.getElementById('run-mot-level-btn');
+if (runMotLevelBtn) {
+    runMotLevelBtn.onclick = async () => {
+        const idInput = document.getElementById('mot-prediction-subject-id');
+        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
+        const subjectId = manualId || getGlobalSubjectId();
+        if (!subjectId) {
+            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+        }
+
+        const resultBox = document.getElementById('mot-level-result');
+        const outputEl = document.getElementById('mot-level-output');
+        const probEl = document.getElementById('mot-level-prob');
+        const scoreEl = document.getElementById('mot-level-score');
+
+        await withLoading(runMotLevelBtn, async () => {
+            const res = await window.api.predictMotivationLevel(subjectId);
+            if (!res || !res.ok) {
+                const msg = res && res.error ? res.error : '预测失败';
+                if (resultBox) resultBox.style.display = 'none';
+                return showModal('预测失败: ' + msg);
+            }
+
+            if (resultBox) resultBox.style.display = 'block';
+            if (outputEl) {
+                outputEl.innerText = `自主动机水平：${res.label_text || '未知'}（分类标签 = ${res.label}）`;
+            }
+            if (probEl && typeof res.prob_high === 'number') {
+                probEl.innerText = `模型输出为「高自主动机水平」的概率：${(res.prob_high * 100).toFixed(1)}%`;
+            }
+            if (scoreEl && typeof res.score === 'number') {
+                scoreEl.innerText = `回归预测的自主动机连续得分：${res.score.toFixed(2)}`;
+            }
+        });
+    };
+}
