@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import joblib
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(__file__)
 MODEL_PATH = os.path.join(PROJECT_ROOT, "model", "predict_cog", "Cog_Type_HybridOvR_best_model.pkl")
 
 # Ensure we can import HybridOvRClassifier for unpickling
@@ -18,7 +18,58 @@ except Exception:
     try:
         from train_domain_model import HybridOvRClassifier  # noqa: F401
     except Exception:
-        HybridOvRClassifier = None  # type: ignore
+        import types
+
+        class HybridOvRClassifier:
+            def __init__(self, estimators_info=None, classes_=None, estimators=None):
+                self.estimators_info = estimators_info or {}
+                self.classes_ = classes_ or []
+                self.estimators = estimators or {}
+
+            def _get_estimator(self, key, info):
+                if isinstance(info, dict):
+                    if "estimator" in info:
+                        return info["estimator"]
+                    if "model" in info:
+                        return info["model"]
+                if hasattr(self, "estimators_") and isinstance(self.estimators_, dict) and key in self.estimators_:
+                    return self.estimators_[key]
+                if isinstance(self.estimators, dict) and key in self.estimators:
+                    return self.estimators[key]
+                return None
+
+            def _predict_score(self, est, X):
+                if hasattr(est, "predict_proba"):
+                    proba = est.predict_proba(X)
+                    if len(proba.shape) == 2 and proba.shape[1] > 1:
+                        return proba[:, 1]
+                    return proba[:, 0]
+                if hasattr(est, "decision_function"):
+                    return est.decision_function(X)
+                return est.predict(X)
+
+            def predict_proba(self, X):
+                classes = list(self.classes_) if len(self.classes_) else list(self.estimators_info.keys())
+                scores = []
+                for cls in classes:
+                    info = self.estimators_info.get(cls, {})
+                    cols = info.get("features") or info.get("feature_names") or []
+                    X_sub = X[cols] if cols else X
+                    est = self._get_estimator(cls, info)
+                    if est is None:
+                        raise ValueError(f"Missing estimator for class {cls}")
+                    score = self._predict_score(est, X_sub)
+                    score = np.array(score).reshape(-1)
+                    scores.append(score)
+                scores = np.vstack(scores).T
+                exp = np.exp(scores - np.max(scores, axis=1, keepdims=True))
+                return exp / exp.sum(axis=1, keepdims=True)
+
+        for module_name in ("train_best_models", "train_domain_model"):
+            if module_name not in sys.modules:
+                mod = types.ModuleType(module_name)
+                setattr(mod, "HybridOvRClassifier", HybridOvRClassifier)
+                sys.modules[module_name] = mod
 
 
 def load_model():

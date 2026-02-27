@@ -10,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 import joblib
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(__file__)
 INPUT_FILE = os.path.join(PROJECT_ROOT, "Grand_Summary_Analysis_Imputed.xlsx")
 MODEL_PATH = os.path.join(PROJECT_ROOT, "model", "predict_ele", "Ele_Level_Custom_Weighted_Optimized_Extreme_1515_best_model.pkl")
 SEED = 42
@@ -184,4 +184,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -8,7 +8,7 @@ import pandas as pd
 import joblib
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(__file__)
 MODEL_DIR = os.path.join(PROJECT_ROOT, "model", "predict_motivation")
 
 PATH_TYPE = os.path.join(MODEL_DIR, "Motivation_Type_Classification_best_model.pkl")
@@ -37,7 +37,7 @@ def build_row(features: Dict[str, Any], cols: List[str]) -> pd.DataFrame:
                 row.at[0, k] = float(v)
             except Exception:
                 continue
-    return row
+    return row.fillna(0)
 
 
 def predict_motivation_type(features: Dict[str, Any]) -> Dict[str, Any]:

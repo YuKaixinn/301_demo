@@ -576,8 +576,9 @@ ipcMain.handle('ele:predictLevel', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', [path.join(__dirname, '..', 'predict_ele_live.py')], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_ele_live.py')], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
       let stdout = '';
@@ -634,8 +635,9 @@ ipcMain.handle('cog:predictType', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', [path.join(__dirname, '..', 'predict_cog_type_live.py')], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_cog_type_live.py')], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
       let stdout = '';
@@ -692,8 +694,9 @@ ipcMain.handle('mot:predictType', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', [path.join(__dirname, '..', 'predict_motivation_live.py'), 'type'], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_motivation_live.py'), 'type'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
       let stdout = '';
@@ -750,8 +753,9 @@ ipcMain.handle('mot:predictLevel', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', [path.join(__dirname, '..', 'predict_motivation_live.py'), 'level'], {
-        stdio: ['pipe', 'pipe', 'pipe']
+      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_motivation_live.py'), 'level'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       });
 
       let stdout = '';
@@ -998,7 +1002,7 @@ ipcMain.handle('physio:computeEMG', async (_event, subjectId) => {
 
 ipcMain.handle('physio:computeEye', async (_event, subjectId) => {
   const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
+    properties: ['openFile', 'multiSelections'],
     filters: [
       { name: 'Eye Data', extensions: ['txt', 'csv', 'asc'] },
       { name: 'All Files', extensions: ['*'] }
@@ -1007,10 +1011,63 @@ ipcMain.handle('physio:computeEye', async (_event, subjectId) => {
   if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
 
   try {
-    const filePath = result.filePaths[0];
-    const analysis = analyzeEye(filePath);
-    analysis.filename = path.basename(filePath);
-    return { ok: true, data: analysis };
+    const requiredTasks = [1, 2, 3, 4, 5];
+    const selectedMap = new Map();
+    result.filePaths.forEach(filePath => {
+      const name = path.basename(filePath);
+      const lower = name.toLowerCase();
+      const match = lower.match(/^task([1-5])_.+\.csv$/);
+      if (match) {
+        const taskId = Number(match[1]);
+        if (!selectedMap.has(taskId)) {
+          selectedMap.set(taskId, { filePath, name });
+        }
+      }
+    });
+    const missing = requiredTasks.filter(taskId => !selectedMap.has(taskId));
+    if (missing.length > 0) {
+      const requiredHint = requiredTasks.map(n => `task${n}_*.csv`).join(', ');
+      const missingHint = missing.map(n => `task${n}_*.csv`).join(', ');
+      return {
+        ok: false,
+        error: `请一次性导入以下5个文件：${requiredHint}；缺少：${missingHint}`
+      };
+    }
+
+    const results = requiredTasks.map(taskId => {
+      const item = selectedMap.get(taskId);
+      const analysis = analyzeEye(item.filePath);
+      analysis.filename = item.name;
+      return analysis;
+    });
+
+    const metricSums = {};
+    const metricCounts = {};
+    results.forEach(res => {
+      const m = res.metrics || {};
+      Object.keys(m).forEach(key => {
+        const val = m[key];
+        if (typeof val === 'number' && !Number.isNaN(val)) {
+          metricSums[key] = (metricSums[key] || 0) + val;
+          metricCounts[key] = (metricCounts[key] || 0) + 1;
+        }
+      });
+    });
+    const avgMetrics = {};
+    Object.keys(metricSums).forEach(key => {
+      const count = metricCounts[key] || 1;
+      avgMetrics[key] = metricSums[key] / count;
+    });
+
+    return {
+      ok: true,
+      data: {
+        isBatch: true,
+        count: results.length,
+        results,
+        metrics: avgMetrics
+      }
+    };
   } catch (e) {
     console.error(e);
     return { ok: false, error: e.message };
