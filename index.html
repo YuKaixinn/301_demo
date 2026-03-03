@@ -18,6 +18,9 @@
       <li class="nav-item" data-page="emg">
         <span>🩺</span> 生理参数采集
       </li>
+      <li class="nav-item" data-page="vr">
+        <span>🥽</span> VR任务
+      </li>
       <li class="nav-item" data-page="analysis">
         <span>📊</span> 数据分析
       </li>
@@ -71,11 +74,6 @@
               <div class="launch-icon">💓</div>
               <div class="launch-title">心电采集 (ECG)</div>
               <button id="launchEcgBtn" class="modern-btn btn-primary">🚀 启动软件</button>
-            </div>
-            <div class="launch-card">
-              <div class="launch-icon">👁️</div>
-              <div class="launch-title">眼动采集 (Eye)</div>
-              <button id="launchEyeBtn" class="modern-btn btn-primary">🚀 启动软件</button>
             </div>
           </div>
         </div>
@@ -136,6 +134,19 @@
         <div id="physio-list" class="modern-card" style="display: none; padding-top: 20px;">
           <h3 style="margin-bottom: 16px; font-size: 18px;">历史记录</h3>
           <div id="physio-list-content" style="font-size:14px; color:#374151;"></div>
+        </div>
+      </div>
+
+      <div id="page-vr" class="page">
+        <div class="modern-card">
+          <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">VR任务</h3>
+          <div class="launch-grid" style="grid-template-columns: minmax(280px, 420px); justify-content: start;">
+            <div class="launch-card">
+              <div class="launch-icon">🥽</div>
+              <div class="launch-title">VR软件启动</div>
+              <button id="launchVrBtn" class="modern-btn btn-primary">🚀 启动软件</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -217,6 +228,7 @@
           <div id="questionnaire-analysis-results" class="results-container" style="display:none; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
             <h4 style="margin-bottom: 16px; color: #4b5563;">分析结果</h4>
             <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+              <div id="questionnaire-radar-training" style="flex: 1; min-width: 350px; height: 400px;"></div>
               <div id="questionnaire-radar-bigfive" style="flex: 1; min-width: 350px; height: 400px;"></div>
               <div id="questionnaire-radar-psycap" style="flex: 1; min-width: 350px; height: 400px;"></div>
             </div>

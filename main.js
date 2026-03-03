@@ -900,7 +900,7 @@ ipcMain.handle('questionnaire:getLatest', async (_, subjectId) => {
 
 ipcMain.handle('questionnaire:getDefault', async () => {
   try {
-    const filePath = path.join(__dirname, 'default_questionnaire.json');
+    const filePath = path.join(__dirname, 'questionnaire.json');
     if (!fs.existsSync(filePath)) {
       return { ok: false, error: '未找到默认问卷配置文件' };
     }

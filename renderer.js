@@ -196,18 +196,44 @@ function renderSeriesChart(elId, xData, yData, title) {
   };
   chart.setOption(option);
 }
+
+function getQuestionnaireItemId(item, index = 0) {
+  if (item && item.id) return String(item.id);
+  const sectionPrefixMap = {
+    '训练动机': 'TM',
+    '五大人格': 'BF',
+    '心理弹性': 'RS',
+    '成就动机': 'AM'
+  };
+  const prefix = item && item.section ? sectionPrefixMap[item.section] : '';
+  const number = item && Number.isFinite(Number(item.number)) ? Number(item.number) : NaN;
+  if (prefix && Number.isFinite(number)) {
+    return `${prefix}${String(number).padStart(2, '0')}`;
+  }
+  return `ITEM_${index + 1}`;
+}
+
+function getQuestionnaireScaleForItem(cfg, item) {
+  if (cfg && cfg.response_scale) return cfg.response_scale;
+  const allScales = (cfg && cfg.scales) ? cfg.scales : {};
+  if (item && item.scale_id && allScales[item.scale_id]) return allScales[item.scale_id];
+  const firstScaleId = Object.keys(allScales)[0];
+  return firstScaleId ? allScales[firstScaleId] : {};
+}
+
 function computeQuestionnaireScores(cfg, answers) {
-  const scale = cfg.response_scale || {};
-  const min = scale.min || 1;
-  const max = scale.max || 5;
   const itemScores = {};
   const items = Array.isArray(cfg.items) ? cfg.items : [];
-  items.forEach(it => {
-    const v = answers[`q_item_${it.id}`];
+  items.forEach((it, index) => {
+    const itemId = getQuestionnaireItemId(it, index);
+    const scale = getQuestionnaireScaleForItem(cfg, it);
+    const min = scale.min || 1;
+    const max = scale.max || 5;
+    const v = answers[`q_item_${itemId}`];
     if (v == null) return;
     const val = parseInt(v, 10);
     const score = it.reverse_scored ? (min + max - val) : val;
-    itemScores[it.id] = score;
+    itemScores[itemId] = score;
   });
   const subscaleScores = {};
   const subscaleNames = {};
@@ -279,54 +305,104 @@ async function renderQuestionnaireFields() {
   if (!res || !res.ok || !res.data) return;
   const cfg = res.data;
   defaultQuestionnaireCfg = cfg;
-  const scale = cfg.response_scale || {};
-  const labels = scale.labels || {};
   
   const titleEl = document.querySelector('#questionnaire-form h3');
   if (titleEl) titleEl.innerText = cfg.title || '技能训练动机问卷';
   
   container.innerHTML = '';
+  const sectionMeta = {
+    '训练动机': {
+      title: '第一部分：训练动机'
+    },
+    '五大人格': {
+      title: '第二部分：大五人格'
+    },
+    '心理弹性': {
+      title: '第三部分：心理弹性'
+    },
+    '成就动机': {
+      title: '第四部分：成就动机'
+    }
+  };
+  const sectionOrder = ['训练动机', '五大人格', '心理弹性', '成就动机'];
+  const grouped = new Map();
+  (Array.isArray(cfg.items) ? cfg.items : []).forEach((item, index) => {
+    const sectionName = item && item.section ? item.section : '其他';
+    if (!grouped.has(sectionName)) grouped.set(sectionName, []);
+    grouped.get(sectionName).push({ item, index });
+  });
+  const renderSections = [
+    ...sectionOrder.filter(name => grouped.has(name)),
+    ...Array.from(grouped.keys()).filter(name => !sectionOrder.includes(name))
+  ];
   const wrap = document.createElement('div');
   wrap.style.display = 'grid';
   wrap.style.gridTemplateColumns = '1fr';
-  wrap.style.gap = '10px';
-  cfg.items.forEach(item => {
-    const group = document.createElement('div');
-    group.style.marginBottom = '14px';
-    const qText = document.createElement('div');
-    qText.style.fontSize = '14px';
-    qText.style.marginBottom = '8px';
-    qText.innerText = item.text;
-    group.appendChild(qText);
-    const optionsRow = document.createElement('div');
-    optionsRow.style.display = 'flex';
-    optionsRow.style.gap = '20px';
-    optionsRow.style.flexWrap = 'wrap';
-    const min = scale.min || 1;
-    const max = scale.max || 5;
-    for (let v = min; v <= max; v++) {
-      const optWrap = document.createElement('label');
-      optWrap.style.display = 'inline-flex';
-      optWrap.style.alignItems = 'center';
-      optWrap.style.gap = '8px';
-      optWrap.style.padding = '4px 8px';
-      optWrap.style.borderRadius = '6px';
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = `q_item_${item.id}`;
-      radio.value = String(v);
-      radio.id = `q_item_${item.id}_${v}`;
-      const txt = document.createElement('span');
-      txt.style.fontSize = '14px';
-      txt.style.color = '#555';
-      txt.innerText = labels[String(v)] || String(v);
-      optWrap.appendChild(radio);
-      optWrap.appendChild(txt);
-      optionsRow.appendChild(optWrap);
-    }
-    group.appendChild(optionsRow);
-    wrap.appendChild(group);
+  wrap.style.gap = '16px';
+  renderSections.forEach(sectionName => {
+    const sectionBlock = document.createElement('div');
+    sectionBlock.style.border = '1px solid #e2e8f0';
+    sectionBlock.style.borderRadius = '10px';
+    sectionBlock.style.padding = '14px';
+    sectionBlock.style.background = '#fbfdff';
+
+    const header = document.createElement('div');
+    header.style.fontSize = '16px';
+    header.style.fontWeight = '600';
+    header.style.color = '#1f2937';
+    header.style.marginBottom = '6px';
+    header.innerText = (sectionMeta[sectionName] && sectionMeta[sectionName].title) || sectionName;
+    sectionBlock.appendChild(header);
+
+    const items = grouped.get(sectionName) || [];
+    items.forEach(({ item, index }, idxInSection) => {
+      const itemId = getQuestionnaireItemId(item, index);
+      const scale = getQuestionnaireScaleForItem(cfg, item);
+      const labels = scale.labels || {};
+      const displayNo = (item && item.number != null) ? item.number : (idxInSection + 1);
+
+      const group = document.createElement('div');
+      group.style.marginBottom = '14px';
+      const qText = document.createElement('div');
+      qText.style.fontSize = '14px';
+      qText.style.marginBottom = '8px';
+      qText.style.color = '#111827';
+      qText.innerText = `${displayNo}. ${item.text || `${sectionName} 第${displayNo}题`}`;
+      group.appendChild(qText);
+
+      const optionsRow = document.createElement('div');
+      optionsRow.style.display = 'flex';
+      optionsRow.style.gap = '20px';
+      optionsRow.style.flexWrap = 'wrap';
+      const min = scale.min || 1;
+      const max = scale.max || 5;
+      for (let v = min; v <= max; v++) {
+        const optWrap = document.createElement('label');
+        optWrap.style.display = 'inline-flex';
+        optWrap.style.alignItems = 'center';
+        optWrap.style.gap = '8px';
+        optWrap.style.padding = '4px 8px';
+        optWrap.style.borderRadius = '6px';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = `q_item_${itemId}`;
+        radio.value = String(v);
+        radio.id = `q_item_${itemId}_${v}`;
+        const txt = document.createElement('span');
+        txt.style.fontSize = '14px';
+        txt.style.color = '#555';
+        txt.innerText = labels[String(v)] || String(v);
+        optWrap.appendChild(radio);
+        optWrap.appendChild(txt);
+        optionsRow.appendChild(optWrap);
+      }
+      group.appendChild(optionsRow);
+      sectionBlock.appendChild(group);
+    });
+
+    wrap.appendChild(sectionBlock);
   });
+
   container.appendChild(wrap);
   container.dataset.rendered = 'true';
 }
@@ -487,176 +563,230 @@ if (analyzeQuestionnaireBtn) {
         if (!subjectId) return showModal('请先在问卷中填写被试编号 (Please enter Subject ID first)');
         
         await withLoading(analyzeQuestionnaireBtn, async () => {
-            const res = await window.api.getLatestQuestionnaire(subjectId);
-            if (res.ok && res.data) {
+            const [scoreRes, cfgRes] = await Promise.all([
+                window.api.getLatestQuestionnaire(subjectId),
+                defaultQuestionnaireCfg ? Promise.resolve({ ok: true, data: defaultQuestionnaireCfg }) : window.api.getDefaultQuestionnaire()
+            ]);
+            if (scoreRes.ok && scoreRes.data) {
+                if (cfgRes && cfgRes.ok && cfgRes.data) defaultQuestionnaireCfg = cfgRes.data;
                 const resultsContainer = document.getElementById('questionnaire-analysis-results');
                 if (resultsContainer) resultsContainer.style.display = 'block';
                 
-                renderQuestionnaireRadar(res.data.scores || {});
-                renderQuestionnaireTable('questionnaire-table-container', res.data.scores || {});
+                renderQuestionnaireRadar(scoreRes.data.scores || {}, defaultQuestionnaireCfg);
+                renderQuestionnaireTable('questionnaire-table-container', scoreRes.data.scores || {}, defaultQuestionnaireCfg);
                 showModal('问卷数据加载成功 (Data Loaded)');
             } else {
-                showModal('加载失败 (Load Failed): ' + (res.error || '未找到数据'));
+                showModal('加载失败 (Load Failed): ' + (scoreRes.error || '未找到数据'));
             }
         });
     };
 }
 
-function renderQuestionnaireTable(containerId, scores) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  
-  const psy = scores.psy_results || {};
-  
-  const createSection = (title, items) => {
-    let html = `<div style="margin-bottom: 20px;">
-      <h5 style="margin: 0 0 10px 0; color: #2563eb; font-size: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">${title}</h5>
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <thead style="background: #f8fafc;">
-          <tr>
-            <th style="text-align: left; padding: 6px; color: #64748b; font-weight: 500;">指标</th>
-            <th style="text-align: right; padding: 6px; color: #64748b; font-weight: 500;">得分</th>
-          </tr>
-        </thead>
-        <tbody>`;
-        
-    items.forEach(([label, key]) => {
-      const val = psy[key];
-      const displayVal = (val !== null && val !== undefined) ? val : '-';
-      html += `
-        <tr style="border-bottom: 1px solid #f1f5f9;">
-          <td style="padding: 6px; color: #334155;">${label}</td>
-          <td style="padding: 6px; text-align: right; font-weight: 600; color: #0f172a;">${displayVal}</td>
-        </tr>`;
-    });
-    
-    html += `</tbody></table></div>`;
-    return html;
-  };
+const questionnaireTheoreticalRanges = {
+  神经质: { min: 8, max: 48 },
+  尽责性: { min: 8, max: 48 },
+  宜人性: { min: 8, max: 48 },
+  开放性: { min: 8, max: 48 },
+  外向性: { min: 8, max: 48 },
+  坚韧: { min: 13, max: 65 },
+  力量: { min: 8, max: 40 },
+  乐观: { min: 4, max: 20 },
+  心理弹性总分: { min: 25, max: 125 },
+  内部动机: { min: 4, max: 20 },
+  整合调节: { min: 4, max: 20 },
+  内摄调节: { min: 4, max: 20 },
+  外在调节: { min: 4, max: 20 },
+  无动机: { min: 4, max: 20 },
+  认同动机: { min: 3, max: 15 },
+  自主动机: { min: -81, max: 91 },
+  成就动机总分: { min: 21, max: 105 }
+};
 
-  const motivation = [
-    ['内部动机', '内部动机_Psy'],
-    ['外部调节', '外部调节_Psy'],
-    ['自主动机', '自主动机_Psy']
-  ];
-
-  container.innerHTML = createSection('学习动机', motivation);
+function getQuestionnaireTheoreticalRangeByName(metricName) {
+  const range = questionnaireTheoreticalRanges[metricName];
+  if (!range) return null;
+  return { min: range.min, max: range.max };
 }
 
-function renderQuestionnaireRadar(scores) {
+function getQuestionnaireSubscaleRange(cfg, subscaleId) {
+  const subs = cfg && cfg.scoring && Array.isArray(cfg.scoring.subscales) ? cfg.scoring.subscales : [];
+  const target = subs.find(s => s.id === subscaleId);
+  if (!target) return { min: 0, max: 100 };
+  const namedRange = getQuestionnaireTheoreticalRangeByName(target.name);
+  if (namedRange) return namedRange;
+  const itemMap = new Map((Array.isArray(cfg.items) ? cfg.items : []).map(it => [it.id, it]));
+  let min = 0;
+  let max = 0;
+  (Array.isArray(target.item_ids) ? target.item_ids : []).forEach(itemId => {
+    const item = itemMap.get(itemId);
+    const scale = getQuestionnaireScaleForItem(cfg, item || {});
+    min += Number(scale.min || 1);
+    max += Number(scale.max || 5);
+  });
+  return { min, max: max > min ? max : min + 1 };
+}
+
+function getQuestionnaireCompositeRange(cfg, compositeId) {
+  const comps = cfg && cfg.scoring && Array.isArray(cfg.scoring.composites) ? cfg.scoring.composites : [];
+  const target = comps.find(c => c.id === compositeId);
+  if (!target || !target.weights) return { min: 0, max: 100 };
+  const namedRange = getQuestionnaireTheoreticalRangeByName(target.name);
+  if (namedRange) return namedRange;
+  let min = 0;
+  let max = 0;
+  Object.keys(target.weights).forEach(subscaleId => {
+    const w = Number(target.weights[subscaleId] || 0);
+    const subRange = getQuestionnaireSubscaleRange(cfg, subscaleId);
+    if (w >= 0) {
+      min += w * subRange.min;
+      max += w * subRange.max;
+    } else {
+      min += w * subRange.max;
+      max += w * subRange.min;
+    }
+  });
+  if (min === max) max = min + 1;
+  if (min > max) return { min: max, max: min };
+  return { min, max };
+}
+
+function renderQuestionnaireTable(containerId, scores, questionnaireCfg) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const subscales = scores.subscales_named || {};
+  const composites = scores.composites_named || {};
+  const metricDefs = [
+    {
+      label: '自主动机',
+      value: Number(composites['自主动机'] || 0),
+      range: getQuestionnaireCompositeRange(questionnaireCfg, 'autonomous_motivation')
+    },
+    {
+      label: '心理弹性总分',
+      value: Number(subscales['心理弹性总分'] || composites['心理弹性总分'] || 0),
+      range: getQuestionnaireSubscaleRange(questionnaireCfg, 'resilience_total')
+    },
+    {
+      label: '成就动机总分',
+      value: Number(subscales['成就动机总分'] || 0),
+      range: getQuestionnaireSubscaleRange(questionnaireCfg, 'achievement_motivation_total')
+    }
+  ];
+
+  const renderMetricCard = (metric) => {
+    const min = Number(metric.range.min || 0);
+    const max = Number(metric.range.max || 100);
+    const safeValue = Number.isFinite(metric.value) ? metric.value : 0;
+    const ratioRaw = max === min ? 0 : (safeValue - min) / (max - min);
+    const ratio = Math.max(0, Math.min(1, ratioRaw));
+    const markerLeft = (ratio * 100).toFixed(2);
+    return `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <span style="font-size:14px;color:#334155;font-weight:600;">${metric.label}</span>
+          <span style="font-size:20px;color:#0f172a;font-weight:700;">${safeValue}</span>
+        </div>
+        <div style="position:relative;height:16px;border-radius:9999px;overflow:hidden;background:linear-gradient(to right,#ef4444 0%,#ef4444 33.333%,#f59e0b 33.333%,#f59e0b 66.666%,#10b981 66.666%,#10b981 100%);">
+          <span style="position:absolute;top:50%;left:${markerLeft}%;transform:translate(-50%,-50%);width:14px;height:14px;background:#111827;border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(15,23,42,0.15);"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:#64748b;">
+          <span>最低 ${min}</span>
+          <span>最高 ${max}</span>
+        </div>
+      </div>
+    `;
+  };
+
+  container.innerHTML = `
+    <h5 style="margin:0 0 12px 0;color:#2563eb;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">关键指标</h5>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+      ${metricDefs.map(renderMetricCard).join('')}
+    </div>
+  `;
+}
+
+function renderQuestionnaireRadar(scores, questionnaireCfg) {
     const subscales = scores.subscales_named || {};
-    const composites = scores.composites_named || {};
+    const radarDefs = [
+      {
+        chartId: 'questionnaire-radar-training',
+        title: '训练动机',
+        color: '#2563eb',
+        dimensions: [
+          { name: '内部动机', subscaleId: 'intrinsic_motivation' },
+          { name: '整合调节', subscaleId: 'integrated_regulation' },
+          { name: '内摄调节', subscaleId: 'introjected_regulation' },
+          { name: '外在调节', subscaleId: 'external_regulation' },
+          { name: '无动机', subscaleId: 'amotivation' },
+          { name: '认同动机', subscaleId: 'identified_motivation' }
+        ]
+      },
+      {
+        chartId: 'questionnaire-radar-bigfive',
+        title: '大五人格',
+        color: '#7c3aed',
+        dimensions: [
+          { name: '神经质', subscaleId: 'neuroticism' },
+          { name: '尽责性', subscaleId: 'conscientiousness' },
+          { name: '宜人性', subscaleId: 'agreeableness' },
+          { name: '开放性', subscaleId: 'openness' },
+          { name: '外向性', subscaleId: 'extraversion' }
+        ]
+      },
+      {
+        chartId: 'questionnaire-radar-psycap',
+        title: '心理弹性',
+        color: '#059669',
+        dimensions: [
+          { name: '坚韧', subscaleId: 'tenacity' },
+          { name: '力量', subscaleId: 'strength' },
+          { name: '乐观', subscaleId: 'optimism' }
+        ]
+      }
+    ];
 
-    // 1. Big Five Radar
-    const chartDomBigFive = document.getElementById('questionnaire-radar-bigfive');
-    if (chartDomBigFive) {
-        const existingInstance = echarts.getInstanceByDom(chartDomBigFive);
-        if (existingInstance) existingInstance.dispose();
-        
-        const myChart = echarts.init(chartDomBigFive);
-        const indicators = [
-            { name: '神经质', max: 8 },
-            { name: '尽责性', max: 8 },
-            { name: '宜人性', max: 8 },
-            { name: '开放性', max: 8 },
-            { name: '外向性', max: 8 }
-        ];
-        
-        const values = indicators.map(ind => subscales[ind.name] || 0);
-        
-        // Auto-scale
-        indicators.forEach((ind, i) => {
-            if (values[i] > ind.max) ind.max = values[i] + 10;
-        });
-        
-        const option = {
-            title: { text: '大五人格', left: 'center' },
-            tooltip: {},
-            radar: {
-                indicator: indicators,
-                center: ['50%', '55%'],
-                radius: '65%'
-            },
-            series: [{
-                name: '大五人格',
-                type: 'radar',
-                data: [{
-                    value: values,
-                    name: '得分'
-                }],
-                areaStyle: { opacity: 0.2, color: '#3b82f6' },
-                lineStyle: { color: '#3b82f6' },
-                itemStyle: { color: '#3b82f6' }
-            }]
-        };
-        myChart.setOption(option);
-        
-        // Add resize listener
-        const resizeHandler = () => myChart.resize();
-        window.addEventListener('resize', resizeHandler);
-        // Store for cleanup if needed, though simple replacement is fine for now
-    }
+    radarDefs.forEach(radarDef => {
+      const chartDom = document.getElementById(radarDef.chartId);
+      if (!chartDom) return;
+      const existingInstance = echarts.getInstanceByDom(chartDom);
+      if (existingInstance) existingInstance.dispose();
 
-    // 2. PsyCap Radar
-    const chartDomPsyCap = document.getElementById('questionnaire-radar-psycap');
-    if (chartDomPsyCap) {
-        const existingInstance = echarts.getInstanceByDom(chartDomPsyCap);
-        if (existingInstance) existingInstance.dispose();
-        
-        const myChart = echarts.init(chartDomPsyCap);
-        
-        // Get Total Resilience Score
-        const totalResilience = subscales['心理弹性总分'] || subscales['心理弹性'] || composites['心理弹性总分'] || 0;
-        
-        const indicators = [
-            { name: '坚韧', max: 8 },
-            { name: '力量', max: 8 },
-            { name: '乐观', max: 8 },
-            { name: '进取', max: 8 },
-            { name: '主动', max: 8 },
-            { name: '求精', max: 8 },
-            { name: '奉献', max: 8 },
-            { name: '乐业', max: 8 },
-            { name: '持续学习', max: 8 }
-        ];
-        
-        const values = indicators.map(ind => subscales[ind.name] || 0);
-        
-        // Auto-scale
-        indicators.forEach((ind, i) => {
-            if (values[i] > ind.max) ind.max = values[i] + 10;
-        });
-        
-        const option = {
-            title: { 
-                text: `心理资本/职业素养\n(心理弹性总分: ${totalResilience})`, 
-                left: 'center',
-                textStyle: { fontSize: 14 }
-            },
-            tooltip: {},
-            radar: {
-                indicator: indicators,
-                center: ['50%', '55%'],
-                radius: '65%'
-            },
-            series: [{
-                name: '心理资本',
-                type: 'radar',
-                data: [{
-                    value: values,
-                    name: '得分 (Score)'
-                }],
-                areaStyle: { opacity: 0.2, color: '#10b981' },
-                lineStyle: { color: '#10b981' },
-                itemStyle: { color: '#10b981' }
-            }]
+      const chart = echarts.init(chartDom);
+      const indicators = radarDef.dimensions.map(dim => {
+        const range = getQuestionnaireSubscaleRange(questionnaireCfg, dim.subscaleId);
+        return {
+          name: dim.name,
+          min: range.min,
+          max: range.max
         };
-        myChart.setOption(option);
-        
-        // Add resize listener
-        const resizeHandler = () => myChart.resize();
-        window.addEventListener('resize', resizeHandler);
-    }
+      });
+      const values = radarDef.dimensions.map(dim => Number(subscales[dim.name] || 0));
+      chart.setOption({
+        title: {
+          text: radarDef.title,
+          left: 'center',
+          textStyle: { fontSize: 16, fontWeight: 600 }
+        },
+        tooltip: {},
+        radar: {
+          indicator: indicators,
+          center: ['50%', '56%'],
+          radius: '64%'
+        },
+        series: [{
+          type: 'radar',
+          data: [{
+            value: values,
+            name: '得分'
+          }],
+          areaStyle: { opacity: 0.2, color: radarDef.color },
+          lineStyle: { color: radarDef.color, width: 2 },
+          itemStyle: { color: radarDef.color }
+        }]
+      });
+      window.addEventListener('resize', () => chart.resize());
+    });
 }
 
 // EMG Analysis
@@ -751,12 +881,12 @@ if (exportEcgBtn) {
   };
 }
 
-// Eye
-const launchEyeBtn = document.getElementById('launchEyeBtn');
-if (launchEyeBtn) {
-  launchEyeBtn.onclick = async () => {
+// VR
+const launchVrBtn = document.getElementById('launchVrBtn');
+if (launchVrBtn) {
+  launchVrBtn.onclick = async () => {
     const subjectId = getGlobalSubjectId();
-    await withLoading(launchEyeBtn, async () => {
+    await withLoading(launchVrBtn, async () => {
       const res = await window.api.launchSoftware('eye', subjectId);
       if (!res.success) throw new Error(res.message);
     });
@@ -859,9 +989,10 @@ if (saveQuestionnaireBtn) {
             if (input.id) data[input.id] = input.value;
         });
         if (defaultQuestionnaireCfg && Array.isArray(defaultQuestionnaireCfg.items)) {
-          defaultQuestionnaireCfg.items.forEach(item => {
-            const checked = document.querySelector(`input[name="q_item_${item.id}"]:checked`);
-            data[`q_item_${item.id}`] = checked ? parseInt(checked.value, 10) : null;
+          defaultQuestionnaireCfg.items.forEach((item, index) => {
+            const itemId = getQuestionnaireItemId(item, index);
+            const checked = document.querySelector(`input[name="q_item_${itemId}"]:checked`);
+            data[`q_item_${itemId}`] = checked ? parseInt(checked.value, 10) : null;
           });
           data.questionnaire_id = defaultQuestionnaireCfg.questionnaire_id || 'default';
           data.title = defaultQuestionnaireCfg.title || '技能训练动机问卷';
