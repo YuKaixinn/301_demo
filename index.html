@@ -96,15 +96,15 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">收缩压 (SBP)</label>
-                    <input type="number" id="pre_sbp" placeholder="mmHg" class="modern-input">
+                    <input type="text" id="pre_sbp" placeholder="mmHg" class="modern-input no-drag">
                   </div>
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">舒张压 (DBP)</label>
-                    <input type="number" id="pre_dbp" placeholder="mmHg" class="modern-input">
+                    <input type="text" id="pre_dbp" placeholder="mmHg" class="modern-input no-drag">
                   </div>
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">心率 (HR)</label>
-                    <input type="number" id="pre_hr" placeholder="bpm" class="modern-input">
+                    <input type="text" id="pre_hr" placeholder="bpm" class="modern-input no-drag">
                   </div>
                 </div>
               </div>
@@ -115,15 +115,15 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">收缩压 (SBP)</label>
-                    <input type="number" id="post_sbp" placeholder="mmHg" class="modern-input">
+                    <input type="text" id="post_sbp" placeholder="mmHg" class="modern-input no-drag">
                   </div>
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">舒张压 (DBP)</label>
-                    <input type="number" id="post_dbp" placeholder="mmHg" class="modern-input">
+                    <input type="text" id="post_dbp" placeholder="mmHg" class="modern-input no-drag">
                   </div>
                   <div>
                     <label style="display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px;">心率 (HR)</label>
-                    <input type="number" id="post_hr" placeholder="bpm" class="modern-input">
+                    <input type="text" id="post_hr" placeholder="bpm" class="modern-input no-drag">
                   </div>
                 </div>
               </div>
@@ -354,11 +354,16 @@
 
           <div id="prediction-result" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e5e7eb;">
             <h4 style="margin:0 0 12px 0; color:#374151;">预测结果</h4>
-            <p id="prediction-output" style="font-size:14px; color:#111827;"></p>
-            <p id="prediction-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
-            <p id="prediction-note" style="font-size:12px; color:#6b7280; margin-top:12px;">
-              当前模型基于 Ele_Level_Custom_Weighted_Optimized_Extreme_1515_best_model.pkl（AUC≈0.80），结合问卷、生理、游戏等多模态指标进行预测。
-            </p>
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+              <div style="flex: 1;">
+                <p id="prediction-output" style="font-size:16px; font-weight: bold; color:#111827; margin-bottom: 8px;"></p>
+                <p id="prediction-prob" style="font-size:14px; color:#4b5563;"></p>
+                <p id="prediction-note" style="font-size:12px; color:#6b7280; margin-top:12px; line-height: 1.5;">
+                  当前模型基于 Ele_Level_Custom_Weighted_Optimized_Extreme_1515_best_model.pkl（AUC≈0.80），结合问卷、生理、游戏等多模态指标进行预测。
+                </p>
+              </div>
+              <div id="ele-gauge-chart" style="width: 300px; height: 250px;"></div>
+            </div>
           </div>
         </div>
 
@@ -376,8 +381,13 @@
 
           <div id="cog-prediction-result" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e5e7eb;">
             <h4 style="margin:0 0 12px 0; color:#374151;">认知优势预测结果</h4>
-            <p id="cog-prediction-output" style="font-size:14px; color:#111827;"></p>
-            <p id="cog-prediction-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+              <div style="flex: 1;">
+                <p id="cog-prediction-output" style="font-size:16px; font-weight: bold; color:#111827; margin-bottom: 8px;"></p>
+                <p id="cog-prediction-prob" style="font-size:14px; color:#4b5563;"></p>
+              </div>
+              <div id="cog-radar-chart" style="width: 350px; height: 300px;"></div>
+            </div>
           </div>
         </div>
 
@@ -397,15 +407,25 @@
 
           <div id="mot-type-result" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e5e7eb;">
             <h4 style="margin:0 0 12px 0; color:#374151;">动机类型预测结果</h4>
-            <p id="mot-type-output" style="font-size:14px; color:#111827;"></p>
-            <p id="mot-type-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+              <div style="flex: 1;">
+                <p id="mot-type-output" style="font-size:16px; font-weight: bold; color:#111827; margin-bottom: 8px;"></p>
+                <p id="mot-type-prob" style="font-size:14px; color:#4b5563;"></p>
+              </div>
+              <div id="mot-type-chart" style="width: 350px; height: 300px;"></div>
+            </div>
           </div>
 
           <div id="mot-level-result" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e5e7eb;">
             <h4 style="margin:0 0 12px 0; color:#374151;">自主动机水平预测结果</h4>
-            <p id="mot-level-output" style="font-size:14px; color:#111827;"></p>
-            <p id="mot-level-prob" style="font-size:13px; color:#4b5563; margin-top:8px;"></p>
-            <p id="mot-level-score" style="font-size:13px; color:#4b5563; margin-top:4px;"></p>
+            <div style="display: flex; gap: 20px; align-items: flex-start;">
+              <div style="flex: 1;">
+                <p id="mot-level-output" style="font-size:16px; font-weight: bold; color:#111827; margin-bottom: 8px;"></p>
+                <p id="mot-level-prob" style="font-size:14px; color:#4b5563;"></p>
+                <p id="mot-level-score" style="font-size:14px; color:#4b5563; margin-top:4px;"></p>
+              </div>
+              <div id="mot-level-chart" style="width: 300px; height: 250px;"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -469,8 +489,9 @@
         
         <div class="modern-card">
           <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">操作中心</h3>
-          <div style="margin-top: 15px;">
+          <div style="margin-top: 15px; display: flex; gap: 12px;">
             <button id="exportUnifiedCsvBtn" class="modern-btn btn-primary">📊 导出统一 CSV</button>
+            <button id="exportPdfReportBtn" class="modern-btn" style="background-color: #ef4444; color: white;">📄 导出综合分析报告 (PDF)</button>
           </div>
         </div>
       </div>

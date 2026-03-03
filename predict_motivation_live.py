@@ -50,8 +50,22 @@ def predict_motivation_type(features: Dict[str, Any]) -> Dict[str, Any]:
     if not cols:
         return {"ok": False, "error": "动机类型模型缺少特征名信息"}
 
+    # Label mapping
+    LABEL_MAP = {
+        0: "外在调节型",
+        1: "自主动机型",
+        "0": "外在调节型",
+        "1": "自主动机型"
+    }
+
+    input_features = {}
     try:
         row = build_row(features, cols)
+        for c in row.columns:
+            val = row.at[0, c]
+            if pd.notna(val):
+                input_features[c] = float(val)
+
         if hasattr(model, "predict_proba"):
             probas = model.predict_proba(row)[0]
             classes = list(model.classes_)
@@ -59,22 +73,31 @@ def predict_motivation_type(features: Dict[str, Any]) -> Dict[str, Any]:
             best_label = classes[idx]
             if hasattr(best_label, "item"):
                 best_label = best_label.item()
-            prob_dict = {str(c): float(p) for c, p in zip(classes, probas)}
+            prob_dict = {}
+            for c, p in zip(classes, probas):
+                c_str = str(c)
+                # Map class name if possible
+                name = LABEL_MAP.get(c, c_str)
+                prob_dict[name] = float(p)
         else:
             y = model.predict(row)[0]
             if hasattr(y, "item"):
                 y = y.item()
             best_label = y
-            prob_dict = {str(y): 1.0}
+            prob_dict = {LABEL_MAP.get(y, str(y)): 1.0}
+            
+        label_text = LABEL_MAP.get(best_label, str(best_label))
+            
     except Exception as e:
         return {"ok": False, "error": f"动机类型预测失败: {e}"}
 
     return {
         "ok": True,
         "label": best_label,
-        "label_text": str(best_label),
+        "label_text": label_text,
         "probs": prob_dict,
         "used_features": cols,
+        "input_features": input_features,
     }
 
 
@@ -91,13 +114,19 @@ def predict_motivation_level(features: Dict[str, Any]) -> Dict[str, Any]:
     if not cols:
         return {"ok": False, "error": "动机水平模型缺少特征名信息"}
 
+    input_features = {}
     try:
         prob_high = None
         label = None
         label_text = None
+        
+        row_cls = build_row(features, cls_cols)
+        for c in row_cls.columns:
+            val = row_cls.at[0, c]
+            if pd.notna(val):
+                input_features[c] = float(val)
 
         if hasattr(cls_model, "predict_proba"):
-            row_cls = build_row(features, cls_cols)
             probas = cls_model.predict_proba(row_cls)[0]
             classes = list(cls_model.classes_)
             if 1 in classes:
@@ -108,7 +137,6 @@ def predict_motivation_level(features: Dict[str, Any]) -> Dict[str, Any]:
             label = int(prob_high >= 0.5)
             label_text = "高自主动机水平" if label == 1 else "较低自主动机水平"
         else:
-            row_cls = build_row(features, cls_cols)
             y = cls_model.predict(row_cls)[0]
             if hasattr(y, "item"):
                 y = y.item()
@@ -119,6 +147,11 @@ def predict_motivation_level(features: Dict[str, Any]) -> Dict[str, Any]:
         score = None
         try:
             row_reg = build_row(features, reg_cols)
+            for c in row_reg.columns:
+                val = row_reg.at[0, c]
+                if pd.notna(val):
+                    input_features[c] = float(val)
+
             y_reg = reg_model.predict(row_reg)[0]
             if hasattr(y_reg, "item"):
                 y_reg = y_reg.item()
@@ -135,6 +168,7 @@ def predict_motivation_level(features: Dict[str, Any]) -> Dict[str, Any]:
         "prob_high": prob_high,
         "score": score,
         "used_features": cols,
+        "input_features": input_features,
     }
 
 

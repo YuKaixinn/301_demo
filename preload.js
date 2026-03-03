@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   computeEye: (subjectId) => ipcRenderer.invoke('physio:computeEye', subjectId),
   exportPhysioSummary: (payload) => ipcRenderer.invoke('physio:exportSummary', payload),
   exportUnifiedCsv: () => ipcRenderer.invoke('export:unifiedCsv'),
+  exportPdfReport: (subjectId) => ipcRenderer.invoke('export:pdfReport', subjectId),
 
   // Cognitive API
   saveCognitiveRecord: (data) => ipcRenderer.invoke('cognitive:saveRecord', data),
