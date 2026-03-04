@@ -148,10 +148,13 @@ def predict_from_features(features):
         return {"ok": False, "error": f"加载训练数据或模型失败: {e}"}
 
     row = pd.DataFrame([np.nan] * len(cols), index=cols).T
+    input_features = {}
     for k, v in features.items():
         if k in row.columns and v is not None:
             try:
-                row.at[0, k] = float(v)
+                val = float(v)
+                row.at[0, k] = val
+                input_features[k] = val
             except Exception:
                 continue
 
@@ -165,6 +168,7 @@ def predict_from_features(features):
         "label": label,
         "label_text": label_text,
         "prob_high": prob_high,
+        "input_features": input_features
     }
 
 

@@ -111,8 +111,14 @@ def predict_from_features(features: dict):
         needed_cols.update(cols)
     needed_cols = sorted(list(needed_cols))
 
+    input_features = {}
     try:
         row = build_row(features, needed_cols)
+        for c in row.columns:
+            val = row.at[0, c]
+            if pd.notna(val):
+                input_features[c] = float(val)
+
         probas = model.predict_proba(row)[0]
         classes = list(model.classes_)
         idx = int(np.argmax(probas))
@@ -126,6 +132,7 @@ def predict_from_features(features: dict):
         "label": best_label,
         "label_text": best_label,
         "probs": prob_dict,
+        "input_features": input_features,
     }
 
 

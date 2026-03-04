@@ -409,6 +409,368 @@ async function renderQuestionnaireFields() {
 
 // --- Render Helpers ---
 
+function renderFeatureBarChart(elId, features) {
+  const chartDom = document.getElementById(elId);
+  if (!chartDom) return;
+  const existing = echarts.getInstanceByDom(chartDom);
+  if (existing) existing.dispose();
+  
+  const chart = echarts.init(chartDom);
+  
+  // features is array of [key, value]
+  const categories = features.map(f => f[0]);
+  const values = features.map(f => f[1]);
+  
+  const option = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+    yAxis: { 
+        type: 'category', 
+        data: categories, 
+        inverse: true,
+        axisLabel: { width: 140, overflow: 'truncate' } 
+    },
+    series: [
+      {
+        type: 'bar',
+        data: values,
+        itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: '#3b82f6' },
+                { offset: 1, color: '#2563eb' }
+            ]),
+            borderRadius: [0, 4, 4, 0]
+        },
+        label: { show: true, position: 'right', formatter: '{c}' }
+      }
+    ]
+  };
+  chart.setOption(option);
+}
+
+function renderKeyMetrics(features, limit) {
+    if (!features) return '';
+    const entries = Object.entries(features).slice(0, limit);
+    return entries.map(([k, v]) => `
+        <div class="pro-metric-card">
+            <div class="pro-metric-label" title="${k}">${k}</div>
+            <div class="pro-metric-value">${typeof v === 'number' ? v.toFixed(2) : v}</div>
+        </div>
+    `).join('');
+}
+
+window.switchProTab = function(el, targetId) {
+    const panel = el.closest('.pro-panel');
+    const tabs = panel.querySelectorAll('.pro-tab');
+    const contents = panel.querySelectorAll('.pro-content');
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    contents.forEach(c => {
+        if (c.dataset.tab === targetId) c.classList.add('active');
+        else c.classList.remove('active');
+    });
+    
+    // Resize charts
+    setTimeout(() => {
+        const charts = panel.querySelectorAll('.pro-content.active div[id^="chart-"]');
+        charts.forEach(div => {
+            const instance = echarts.getInstanceByDom(div);
+            if (instance) instance.resize();
+        });
+    }, 50);
+};
+
+function getGuidance(type, label, labelText) {
+    const templates = {
+        'ele': {
+            '高水平': '该士兵体能综合素质优异，具备较强的高强度持续作战能力。建议：1. 保持当前训练强度，巩固优势；2. 可适当增加极限环境下的适应性训练；3. 适合承担高负荷突击任务。',
+            '低水平': '该士兵体能基础相对薄弱，在高负荷任务中可能出现耐力不足。建议：1. 重点加强心肺耐力与核心力量的基础训练；2. 制定循序渐进的增负计划，避免运动损伤；3. 关注营养摄入与恢复，提升体能储备。'
+        },
+        'cog': {
+            '记忆强': '该士兵在工作记忆与信息保持方面表现突出。建议：1. 适合安排情报分析、复杂指令传达等任务；2. 训练中可增加多任务并行处理的难度；3. 发挥其在细节捕捉上的优势。',
+            '推理强': '该士兵逻辑推理与战术理解能力较强。建议：1. 适合参与战术规划、现场指挥决策等岗位；2. 训练中增加战场态势研判环节；3. 鼓励其参与战法创新研讨。',
+            '执行强': '该士兵反应速度快，执行指令果断。建议：1. 适合担任突击手、驾驶员等对反应速度要求高的角色；2. 训练中强化瞬时反应与压力下的动作精准度；3. 保持高强度的实战化模拟训练。'
+        },
+        'mot_type': {
+            '自主动机型': '该类型个体主要受内在兴趣、个人价值认同驱动。建议：给予充分的自主权，鼓励其挑战更高目标，发挥榜样作用。',
+            '外在调节型': '该类型个体主要受外部奖惩、压力或顺从意愿驱动。建议：建立明确的奖惩反馈机制，逐步引导其寻找训练的内在乐趣。',
+            '内部动机': '该士兵训练热情源于内心热爱，积极性高。建议：给予充分的自主权，鼓励其挑战更高目标，发挥榜样作用。',
+            '认同动机': '该士兵认同训练价值，自觉性较好。建议：明确任务意义，强化其对集体目标的认同感。',
+            '外在调节': '该士兵主要受奖惩机制驱动。建议：建立明确的奖惩反馈机制，逐步引导其寻找训练的内在乐趣。',
+            '无动机': '该士兵缺乏训练动力，可能存在心理倦怠。建议：重点关注心理状态，进行深入沟通，寻找动力阻碍点，制定个性化激励方案。'
+        },
+        'mot_level': {
+            '高自主动机水平': '心理韧性强，抗压能力出色。建议：可委以重任，在团队中担任精神核心，带动整体士气。',
+            '较低自主动机水平': '易受外界环境影响，情绪波动可能较大。建议：加强心理疏导与抗压训练，多给予正向反馈，帮助建立自信心。'
+        }
+    };
+
+    let key = type;
+    let subKey = labelText;
+    
+    // Fuzzy match for label text if exact match not found
+    if (templates[key]) {
+        if (templates[key][subKey]) return templates[key][subKey];
+        for (const k in templates[key]) {
+            if (subKey.includes(k)) return templates[key][k];
+        }
+    }
+    
+    return '暂无特定指导意见。建议结合具体各项指标进行针对性补强。';
+}
+
+function renderProfessionalPanel(containerId, res, options) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.style.display = 'block';
+    
+    // Unique IDs
+    const uid = Math.random().toString(36).substr(2, 9);
+    const overviewChartId = `chart-overview-${uid}`;
+    const featureChartId = `chart-features-${uid}`;
+    
+    // Prepare features
+    const features = res.input_features || {};
+    // Sort by absolute value descending for visualization relevance (heuristic)
+    const sortedFeatures = Object.entries(features)
+        .filter(([k, v]) => typeof v === 'number' && !isNaN(v))
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+        .slice(0, 15);
+
+    const topFeatures = sortedFeatures.slice(0, 6);
+    // Removed metrics preview as per user request
+    /*
+    const renderMetricsHtml = (entries) => entries.map(([k, v]) => `
+        <div class="pro-metric-card">
+            <div class="pro-metric-label" title="${k}">${k}</div>
+            <div class="pro-metric-value">${typeof v === 'number' ? v.toFixed(2) : v}</div>
+        </div>
+    `).join('');
+    */
+
+    const guidanceText = getGuidance(
+        options.guidanceKey || options.tag.toLowerCase(), 
+        res.label, 
+        res.label_text || res.label
+    );
+
+    const tabsHtml = `
+      <div class="pro-panel">
+        <div class="pro-tabs">
+          <div class="pro-tab active" onclick="switchProTab(this, 'overview')">总览 (Overview)</div>
+          <div class="pro-tab" onclick="switchProTab(this, 'analysis')">结果分析 (Analysis)</div>
+        </div>
+        
+        <div class="pro-content active" data-tab="overview">
+           <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 280px;">
+                 <div style="margin-bottom: 12px;">
+                    <span style="background: ${options.color || '#2563eb'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                        ${options.tag || 'PREDICTION'}
+                    </span>
+                 </div>
+                 <h2 style="margin: 0 0 12px 0; color: #1e293b; font-size: 24px;">${res.label_text || '未知'}</h2>
+                 <p style="color: #64748b; font-size: 14px; margin: 0 0 24px 0; line-height: 1.5;">
+                    ${options.description || '基于多模态数据的智能预测结果'}
+                 </p>
+                 
+                 <!-- Removed Key Metrics Preview -->
+              </div>
+              <div id="${overviewChartId}" style="width: 400px; height: 320px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9;"></div>
+           </div>
+        </div>
+        
+        <div class="pro-content" data-tab="analysis">
+           <div style="background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+             <h4 style="margin: 0 0 8px 0; color: #0c4a6e; font-size: 16px;">💡 指导与建议</h4>
+             <p style="margin: 0; color: #334155; font-size: 14px; line-height: 1.6;">
+               ${guidanceText}
+             </p>
+           </div>
+        </div>
+      </div>
+    `;
+    
+    container.innerHTML = tabsHtml;
+    
+    // Render Charts
+    setTimeout(() => {
+        if (options.type === 'gauge') {
+            renderGaugeChart(overviewChartId, options.value, options.valueTitle, options.min, options.max, options.isPercent);
+        } else if (options.type === 'radar') {
+            renderRadarChart(overviewChartId, options.radarData, options.radarTitle);
+        }
+        
+        // renderFeatureBarChart(featureChartId, sortedFeatures);
+    }, 0);
+}
+
+function renderGaugeChart(elId, value, title, min = 0, max = 1, isPercent = true) {
+  const chartDom = document.getElementById(elId);
+  if (!chartDom) return;
+  
+  // Dispose existing instance if any
+  const existingInstance = echarts.getInstanceByDom(chartDom);
+  if (existingInstance) existingInstance.dispose();
+
+  const chart = echarts.init(chartDom);
+  
+  const val = isPercent ? (value * 100).toFixed(1) : value.toFixed(1);
+  const displayVal = parseFloat(val);
+  
+  // Color calculation for gauge progress
+  // For standard 0-100 or 0-1, we can use standard colors.
+  // For custom range like -81 to 91, we might need mapped colors.
+  
+  const option = {
+    series: [
+      {
+        type: 'gauge',
+        startAngle: 180,
+        endAngle: 0,
+        min: min,
+        max: max,
+        splitNumber: 5,
+        itemStyle: {
+          color: '#58D9F9',
+          shadowColor: 'rgba(0,138,255,0.45)',
+          shadowBlur: 10,
+          shadowOffsetX: 2,
+          shadowOffsetY: 2
+        },
+        progress: {
+          show: true,
+          roundCap: true,
+          width: 12
+        },
+        pointer: {
+          show: true,
+          length: '70%',
+          width: 6,
+          itemStyle: { color: 'auto' }
+        },
+        axisLine: {
+          roundCap: true,
+          lineStyle: {
+            width: 12
+          }
+        },
+        axisTick: {
+          splitNumber: 2,
+          lineStyle: {
+            width: 2,
+            color: '#999'
+          }
+        },
+        splitLine: {
+          length: 20,
+          lineStyle: {
+            width: 3,
+            color: '#999'
+          }
+        },
+        axisLabel: {
+          distance: 25,
+          color: '#999',
+          fontSize: 12
+        },
+        title: {
+          show: true,
+          offsetCenter: [0, '30%'],
+          fontSize: 14,
+          color: '#555'
+        },
+        detail: {
+          valueAnimation: true,
+          formatter: function (value) {
+            return value.toFixed(1) + (isPercent ? '%' : '');
+          },
+          color: '#333',
+          fontSize: 20,
+          offsetCenter: [0, '65%']
+        },
+        data: [
+          {
+            value: displayVal,
+            name: title
+          }
+        ]
+      }
+    ]
+  };
+  chart.setOption(option);
+}
+
+function renderRadarChart(elId, probs, title) {
+  const chartDom = document.getElementById(elId);
+  if (!chartDom) return;
+  
+  const existingInstance = echarts.getInstanceByDom(chartDom);
+  if (existingInstance) existingInstance.dispose();
+
+  const chart = echarts.init(chartDom);
+  
+  const keys = Object.keys(probs);
+  const indicators = keys.map(key => ({
+    name: key,
+    max: 1.0 
+  }));
+  
+  const values = keys.map(k => probs[k]);
+  
+  const option = {
+    title: {
+      text: title,
+      left: 'center',
+      top: 10,
+      textStyle: { fontSize: 15, color: '#333' }
+    },
+    tooltip: {},
+    radar: {
+      indicator: indicators,
+      center: ['50%', '55%'],
+      radius: '65%',
+      splitArea: {
+        areaStyle: {
+          color: ['#f8f9fa', '#f1f5f9', '#e2e8f0', '#cbd5e1']
+        }
+      }
+    },
+    series: [
+      {
+        type: 'radar',
+        data: [
+          {
+            value: values,
+            name: title
+          }
+        ],
+        symbol: 'circle',
+        symbolSize: 6,
+        areaStyle: {
+          opacity: 0.4,
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(59, 130, 246, 0.6)' },
+            { offset: 1, color: 'rgba(37, 99, 235, 0.8)' }
+          ])
+        },
+        lineStyle: {
+            color: '#2563eb',
+            width: 2
+        },
+        itemStyle: {
+            color: '#2563eb'
+        }
+      }
+    ]
+  };
+  chart.setOption(option);
+}
+
 function renderEmgResult(d, subjectId) {
   const container = document.getElementById('emg-results');
   if (container) container.style.display = 'block';
@@ -1049,7 +1411,11 @@ if (savePhysioBtn) {
         const inputs = document.querySelectorAll('#physio-section input');
         const data = {};
         inputs.forEach(input => {
-            if (input.id) data[input.id] = input.value;
+            if (input.id && input.value !== '') {
+                // Try to parse as float if it looks like a number
+                const val = parseFloat(input.value);
+                data[input.id] = isNaN(val) ? input.value : val;
+            }
         });
         const subjectId = getGlobalSubjectId();
         if (!subjectId) return showModal('请先在问卷中填写 Subject ID');
@@ -1094,6 +1460,26 @@ if (exportUnifiedCsvBtn) {
             } else {
                 const msg = res && res.error ? res.error : '未知错误';
                 showModal('导出失败 (Export Failed): ' + msg);
+            }
+        });
+    };
+}
+
+const exportPdfReportBtn = document.getElementById('exportPdfReportBtn');
+if (exportPdfReportBtn) {
+    exportPdfReportBtn.onclick = async () => {
+        const subjectId = getGlobalSubjectId();
+        if (!subjectId) {
+            return showModal('请先填写被试编号 (Please enter Subject ID first)');
+        }
+        
+        await withLoading(exportPdfReportBtn, async () => {
+            const res = await window.api.exportPdfReport(subjectId);
+            if (res && res.ok) {
+                showModal('PDF 报告已生成 (PDF Report Generated): ' + res.filePath);
+            } else {
+                const msg = res && res.error ? res.error : '未知错误';
+                showModal('生成报告失败 (Generation Failed): ' + msg);
             }
         });
     };
@@ -1307,12 +1693,19 @@ if (runPredictionBtn) {
             }
 
             if (resultBox) resultBox.style.display = 'block';
-            if (outputEl) {
-                outputEl.innerText = `预测等级：${res.label_text || '未知'}（分类标签 = ${res.label}）`;
-            }
-            if (probEl && typeof res.prob_high === 'number') {
-                probEl.innerText = `模型输出为「高水平」的概率：${(res.prob_high * 100).toFixed(1)}%`;
-            }
+            
+            renderProfessionalPanel('prediction-result', res, {
+                type: 'gauge',
+                value: res.prob_high,
+                valueTitle: '高水平概率',
+                min: 0,
+                max: 1,
+                isPercent: true,
+                tag: '体能等级 (ELE)',
+                guidanceKey: 'ele',
+                color: '#0ea5e9',
+                description: `模型预测结果为：<strong>${res.label_text}</strong>。<br>综合分析了问卷、生理及体能测试数据。`
+            });
         });
     };
 }
@@ -1328,8 +1721,6 @@ if (runCogPredictionBtn) {
         }
 
         const resultBox = document.getElementById('cog-prediction-result');
-        const outputEl = document.getElementById('cog-prediction-output');
-        const probEl = document.getElementById('cog-prediction-prob');
 
         await withLoading(runCogPredictionBtn, async () => {
             const res = await window.api.predictCogType(subjectId);
@@ -1340,16 +1731,16 @@ if (runCogPredictionBtn) {
             }
 
             if (resultBox) resultBox.style.display = 'block';
-            if (outputEl) {
-                outputEl.innerText = `认知优势类型：${res.label_text || res.label || '未知'}`;
-            }
-            if (probEl && res.probs) {
-                const parts = Object.keys(res.probs).map(k => {
-                    const v = res.probs[k];
-                    return `${k}: ${(v * 100).toFixed(1)}%`;
-                });
-                probEl.innerText = `各类型概率：${parts.join('， ')}`;
-            }
+            
+            renderProfessionalPanel('cog-prediction-result', res, {
+                type: 'radar',
+                radarData: res.probs,
+                radarTitle: '认知类型分布',
+                tag: '认知类型 (COG)',
+                guidanceKey: 'cog',
+                color: '#8b5cf6',
+                description: `模型预测优势类型为：<strong>${res.label_text || res.label}</strong>。<br>基于多项认知任务指标的综合评估。`
+            });
         });
     };
 }
@@ -1365,8 +1756,6 @@ if (runMotTypeBtn) {
         }
 
         const resultBox = document.getElementById('mot-type-result');
-        const outputEl = document.getElementById('mot-type-output');
-        const probEl = document.getElementById('mot-type-prob');
 
         await withLoading(runMotTypeBtn, async () => {
             const res = await window.api.predictMotivationType(subjectId);
@@ -1377,16 +1766,16 @@ if (runMotTypeBtn) {
             }
 
             if (resultBox) resultBox.style.display = 'block';
-            if (outputEl) {
-                outputEl.innerText = `动机类型：${res.label_text || res.label || '未知'}`;
-            }
-            if (probEl && res.probs) {
-                const parts = Object.keys(res.probs).map(k => {
-                    const v = res.probs[k];
-                    return `${k}: ${(v * 100).toFixed(1)}%`;
-                });
-                probEl.innerText = `各类型概率：${parts.join('， ')}`;
-            }
+            
+            renderProfessionalPanel('mot-type-result', res, {
+                type: 'radar',
+                radarData: res.probs,
+                radarTitle: '动机类型分布',
+                tag: '动机类型 (MOT TYPE)',
+                guidanceKey: 'mot_type',
+                color: '#f59e0b',
+                description: `模型预测主导动机为：<strong>${res.label_text || res.label}</strong>。<br>基于多维心理问卷数据的分类结果。`
+            });
         });
     };
 }
@@ -1402,9 +1791,6 @@ if (runMotLevelBtn) {
         }
 
         const resultBox = document.getElementById('mot-level-result');
-        const outputEl = document.getElementById('mot-level-output');
-        const probEl = document.getElementById('mot-level-prob');
-        const scoreEl = document.getElementById('mot-level-score');
 
         await withLoading(runMotLevelBtn, async () => {
             const res = await window.api.predictMotivationLevel(subjectId);
@@ -1415,15 +1801,19 @@ if (runMotLevelBtn) {
             }
 
             if (resultBox) resultBox.style.display = 'block';
-            if (outputEl) {
-                outputEl.innerText = `自主动机水平：${res.label_text || '未知'}（分类标签 = ${res.label}）`;
-            }
-            if (probEl && typeof res.prob_high === 'number') {
-                probEl.innerText = `模型输出为「高自主动机水平」的概率：${(res.prob_high * 100).toFixed(1)}%`;
-            }
-            if (scoreEl && typeof res.score === 'number') {
-                scoreEl.innerText = `回归预测的自主动机连续得分：${res.score.toFixed(2)}`;
-            }
+            
+            renderProfessionalPanel('mot-level-result', res, {
+                type: 'gauge',
+                value: res.score,
+                valueTitle: '自主动机得分',
+                min: -81,
+                max: 91,
+                isPercent: false,
+                tag: '动机水平 (MOT LEVEL)',
+                guidanceKey: 'mot_level',
+                color: '#10b981',
+                description: `预测等级：<strong>${res.label_text}</strong>。<br>回归预测得分为 ${res.score.toFixed(2)}。`
+            });
         });
     };
 }
