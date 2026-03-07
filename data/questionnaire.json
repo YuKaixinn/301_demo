@@ -1,0 +1,1005 @@
+{
+  "questionnaire_id": "questionnaire",
+  "title": "五大人格、心理弹性与成就动机问卷",
+  "language": "zh-CN",
+  "scales": {
+    "likert5_agreement": {
+      "type": "likert",
+      "min": 1,
+      "max": 5,
+      "labels": {
+        "1": "非常不符合",
+        "2": "比较不符合",
+        "3": "一般",
+        "4": "比较符合",
+        "5": "非常符合"
+      }
+    },
+    "likert5_agreement_alt": {
+      "type": "likert",
+      "min": 1,
+      "max": 5,
+      "labels": {
+        "1": "非常不同意",
+        "2": "不同意",
+        "3": "不确定",
+        "4": "同意",
+        "5": "非常同意"
+      }
+    },
+    "likert6_cbfpib": {
+      "type": "likert",
+      "min": 1,
+      "max": 6,
+      "labels": {
+        "1": "完全不符",
+        "2": "大部分不符",
+        "3": "有点不符合",
+        "4": "有点符合",
+        "5": "大部分符合",
+        "6": "完全符合"
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "BF01",
+      "section": "五大人格",
+      "number": 1,
+      "text": "我常感到害怕",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF02",
+      "section": "五大人格",
+      "number": 2,
+      "text": "一旦确定了目标，我会坚持努力地实现它",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF03",
+      "section": "五大人格",
+      "number": 3,
+      "text": "我觉得大部分人基本上是心怀善意的",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF04",
+      "section": "五大人格",
+      "number": 4,
+      "text": "我头脑中经常充满生动的画面",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF05",
+      "section": "五大人格",
+      "number": 5,
+      "text": "我对人多的聚会感到乏味",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF06",
+      "section": "五大人格",
+      "number": 6,
+      "text": "有时我觉得自己一无是处",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF07",
+      "section": "五大人格",
+      "number": 7,
+      "text": "我常常是仔细考虑之后才做出决定",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF08",
+      "section": "五大人格",
+      "number": 8,
+      "text": "我不太关心别人是否受到不公正的待遇",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF09",
+      "section": "五大人格",
+      "number": 9,
+      "text": "我是个勇于冒险，突破常规的人",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF10",
+      "section": "五大人格",
+      "number": 10,
+      "text": "在热闹的聚会上，我常常表现主动并尽情玩耍",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF11",
+      "section": "五大人格",
+      "number": 11,
+      "text": "别人一句漫不经心的话，我常会联系在自己身上",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF12",
+      "section": "五大人格",
+      "number": 12,
+      "text": "别人认为我是个慎重的人",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF13",
+      "section": "五大人格",
+      "number": 13,
+      "text": "我时常觉得别人的痛苦与我无关",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF14",
+      "section": "五大人格",
+      "number": 14,
+      "text": "我喜欢冒险",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF15",
+      "section": "五大人格",
+      "number": 15,
+      "text": "我尽量避免参加人多的聚会和嘈杂的环境",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF16",
+      "section": "五大人格",
+      "number": 16,
+      "text": "在面对压力时，我有种快要崩溃的感觉",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF17",
+      "section": "五大人格",
+      "number": 17,
+      "text": "我喜欢一开头就把事情计划好",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF18",
+      "section": "五大人格",
+      "number": 18,
+      "text": "我是那种只照顾好自己，不替别人担忧的人",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF19",
+      "section": "五大人格",
+      "number": 19,
+      "text": "我对许多事情有着很强的好奇心",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF20",
+      "section": "五大人格",
+      "number": 20,
+      "text": "有我在的场合一般不会冷场",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF21",
+      "section": "五大人格",
+      "number": 21,
+      "text": "我常担忧一些无关紧要的事情",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF22",
+      "section": "五大人格",
+      "number": 22,
+      "text": "我工作或学习很勤奋",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF23",
+      "section": "五大人格",
+      "number": 23,
+      "text": "虽然社会上有些骗子，但我觉得大部分人还是可信的",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF24",
+      "section": "五大人格",
+      "number": 24,
+      "text": "我身上具有别人没有的冒险精神",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF25",
+      "section": "五大人格",
+      "number": 25,
+      "text": "在一个团体中，我希望处于领导地位",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF26",
+      "section": "五大人格",
+      "number": 26,
+      "text": "我常常感到内心不踏实",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF27",
+      "section": "五大人格",
+      "number": 27,
+      "text": "我是个倾尽全力做事的人",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF28",
+      "section": "五大人格",
+      "number": 28,
+      "text": "当别人向我诉说不幸时，我常感到难过",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF29",
+      "section": "五大人格",
+      "number": 29,
+      "text": "我渴望学习一些新东西，即使它们与我的日常生活无关",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF30",
+      "section": "五大人格",
+      "number": 30,
+      "text": "别人多认为我是一个热情和友好的人",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF31",
+      "section": "五大人格",
+      "number": 31,
+      "text": "我常担心有什么不好的事情要发生",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF32",
+      "section": "五大人格",
+      "number": 32,
+      "text": "在工作上，我常只求能应付过去便可",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF33",
+      "section": "五大人格",
+      "number": 33,
+      "text": "尽管人类社会存在着一些阴暗的东西（如战争、罪恶、欺诈），我仍然相信人性总的来说是善良的。",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF34",
+      "section": "五大人格",
+      "number": 34,
+      "text": "我的想象力相当丰富",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF35",
+      "section": "五大人格",
+      "number": 35,
+      "text": "我喜欢参加社交与娱乐聚会",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF36",
+      "section": "五大人格",
+      "number": 36,
+      "text": "我很少感到忧郁或沮丧",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": true,
+      "reverse_rule": {
+        "type": "linear",
+        "formula": "7 - x"
+      }
+    },
+    {
+      "id": "BF37",
+      "section": "五大人格",
+      "number": 37,
+      "text": "做事讲究逻辑和条理是我的一个特点",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF38",
+      "section": "五大人格",
+      "number": 38,
+      "text": "我常为那些遭遇不幸的人感到难过",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF39",
+      "section": "五大人格",
+      "number": 39,
+      "text": "我很愿意也很容易接受那些新事物、新观点、新想法",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "BF40",
+      "section": "五大人格",
+      "number": 40,
+      "text": "我希望成为领导者而不是被领导者",
+      "scale_id": "likert6_cbfpib",
+      "reverse_scored": false,
+      "reverse_rule": null
+    },
+    {
+      "id": "RS01",
+      "section": "心理弹性",
+      "number": 1,
+      "text": "我能适应变化",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS02",
+      "section": "心理弹性",
+      "number": 2,
+      "text": "我有亲密、安全的关系",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS03",
+      "section": "心理弹性",
+      "number": 3,
+      "text": "有时，命运或上帝能帮忙",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS04",
+      "section": "心理弹性",
+      "number": 4,
+      "text": "无论发生什么我都能应付",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS05",
+      "section": "心理弹性",
+      "number": 5,
+      "text": "过去的成功让我有信心面对挑战",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS06",
+      "section": "心理弹性",
+      "number": 6,
+      "text": "我能看到事情幽默的一面",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS07",
+      "section": "心理弹性",
+      "number": 7,
+      "text": "应对压力使我感到有力量",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS08",
+      "section": "心理弹性",
+      "number": 8,
+      "text": "经历艰难或疾病后,我往往会很快恢复",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS09",
+      "section": "心理弹性",
+      "number": 9,
+      "text": "事情发生总是有原因的",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS10",
+      "section": "心理弹性",
+      "number": 10,
+      "text": "无论结果怎样，我都会尽自己最大努力",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS11",
+      "section": "心理弹性",
+      "number": 11,
+      "text": "我能实现自己的目标",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS12",
+      "section": "心理弹性",
+      "number": 12,
+      "text": "当事情看起来没什么希望时,我不会轻易放弃",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS13",
+      "section": "心理弹性",
+      "number": 13,
+      "text": "我知道去哪里寻求帮助",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS14",
+      "section": "心理弹性",
+      "number": 14,
+      "text": "在压力下,我能够集中注意力并清晰思考",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS15",
+      "section": "心理弹性",
+      "number": 15,
+      "text": "我喜欢在解决问题时起带头作用",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS16",
+      "section": "心理弹性",
+      "number": 16,
+      "text": "我不会因失败而气馁",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS17",
+      "section": "心理弹性",
+      "number": 17,
+      "text": "我认为自己是个强有力的人",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS18",
+      "section": "心理弹性",
+      "number": 18,
+      "text": "我能做出不寻常的或艰难的决定",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS19",
+      "section": "心理弹性",
+      "number": 19,
+      "text": "我能处理不快乐的情绪",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS20",
+      "section": "心理弹性",
+      "number": 20,
+      "text": "我不得不按照预感行事",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS21",
+      "section": "心理弹性",
+      "number": 21,
+      "text": "我有强烈的目的感",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS22",
+      "section": "心理弹性",
+      "number": 22,
+      "text": "我感觉能掌控自己的生活",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS23",
+      "section": "心理弹性",
+      "number": 23,
+      "text": "我喜欢挑战",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS24",
+      "section": "心理弹性",
+      "number": 24,
+      "text": "我努力工作以达到目标",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "RS25",
+      "section": "心理弹性",
+      "number": 25,
+      "text": "我对自己的成绩感到骄傲",
+      "scale_id": "likert5_agreement",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM01",
+      "section": "成就动机",
+      "number": 1,
+      "text": "对自己职业生涯有总体的规划和设计，并在每一阶段都设定为之奋斗的目标。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM02",
+      "section": "成就动机",
+      "number": 2,
+      "text": "珍视集体和个人的成绩和荣誉，不满足于已取得的成绩和荣誉，不断地争取更大的成绩，获得新的荣誉。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM03",
+      "section": "成就动机",
+      "number": 3,
+      "text": "不希望工作落后于他人或差于先前的标准，经常与他人、前任或自己以前的业绩比较，希望得到有关工作绩效的及时明确的反馈信息，从而了解自己是否有进步。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM04",
+      "section": "成就动机",
+      "number": 4,
+      "text": "有意识地收集和整理与行业相关资料，留意与工作相关的信息、谈话。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM05",
+      "section": "成就动机",
+      "number": 5,
+      "text": "自觉地对工作相关问题的寻找、思考、分析、研究、设计（如：对上级、自身和其他同类团体工作情况的优势和劣势的分析，积极思考和寻找做出成绩的突破口；思考一些方法，研究和设计一些物品，以提高效率或解决问题）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM06",
+      "section": "成就动机",
+      "number": 6,
+      "text": "执行任务前，思考可能会发生的情况，权衡利弊和人选，并提前做好的准备或预防工作；执行任务时，准备了上级没有具体要求的与工作相关的物品，作为备用。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM07",
+      "section": "成就动机",
+      "number": 7,
+      "text": "在完成任务过程中，注意积累和总结经验教训，为下一次任务做准备；在先前有失败或失误的教训，在类似的工作中，注意这类问题，避免再次发生。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM08",
+      "section": "成就动机",
+      "number": 8,
+      "text": "有意识地提高自己，不断补充各方面的知识和技能；分析优秀人员的特点；学习他们的知识、技能、技巧等；发现自己在工作中有不足地方，主动地看书或请教，并有意识地尝试、练习或改正；意识到或他人提醒有价值的工作，会去思考并尝试。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM09",
+      "section": "成就动机",
+      "number": 9,
+      "text": "工作讲求高标准，要求自己和属下竭其所能完成预定任务。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM10",
+      "section": "成就动机",
+      "number": 10,
+      "text": "要求工作的每一个细节都尽量做到最好；进行任务检查时，对达不到标准的要求返工，直到达到预期标准为止；工作过程中，反复修改设计或初步的成果，直到达到满意为止。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM11",
+      "section": "成就动机",
+      "number": 11,
+      "text": "严格要求自己的工作成果，不把不完善的成果公开或上交。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM12",
+      "section": "成就动机",
+      "number": 12,
+      "text": "遇到困难、阻力或失败，能够迅速摆脱失败带来的阴影，不气馁、不放弃或降低标准，想办法，并进行多次尝试。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM13",
+      "section": "成就动机",
+      "number": 13,
+      "text": "为达到某一工作目的，而进行长时间的、反复的尝试；在某一职位上正常晋升年限，仍对前途有希望，努力工作；或功成名就且在事业上不能再有突破时，仍努力工作。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM14",
+      "section": "成就动机",
+      "number": 14,
+      "text": "为了工作，可以暂时或长久地放弃可能或可以获得金钱和财产，或者可能或必须损失的金钱和财产（如放弃了到地方赚钱的机会，选择留在部队发展）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM15",
+      "section": "成就动机",
+      "number": 15,
+      "text": "为了工作，可以牺牲健康、身体的健全，甚至生命（如在战场上流血牺牲）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM16",
+      "section": "成就动机",
+      "number": 16,
+      "text": "为了工作，可以暂时或长久地放弃可能或可以获得的尊重、荣誉、地位、权力，认同等，甚至会丧失已有的这些功名（如隐姓埋名地默默工作）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM17",
+      "section": "成就动机",
+      "number": 17,
+      "text": "为了工作，以牺牲个人情感为代价，暂时或长久地放弃可能或可以获得的亲情、爱情、友情，甚至会损伤这些情感（为了工作，无法照顾父母和妻儿）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM18",
+      "section": "成就动机",
+      "number": 18,
+      "text": "为了工作，可以牺牲休闲娱乐等的时间和机会（如为了干好工作，可以加班加点地工作，放弃休假）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM19",
+      "section": "成就动机",
+      "number": 19,
+      "text": "对自己的工作相关问题感兴趣（如：喜欢看管理或教育方面的书籍、报刊、杂志）。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM20",
+      "section": "成就动机",
+      "number": 20,
+      "text": "对自己职业的赞同，成为其中的一员感到荣耀。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    },
+    {
+      "id": "AM21",
+      "section": "成就动机",
+      "number": 21,
+      "text": "如果在工作中通过努力解决一个问题，或者完成一项任务，感觉非常开心，通过努力，实现自己想法(如管理、作战思想等)，会带来满足感；感觉物质奖励都没有完成任务后的喜悦重要。",
+      "scale_id": "likert5_agreement_alt",
+      "reverse_scored": false
+    }
+  ],
+  "scoring": {
+    "notes": [
+      "所有分量表均为题目得分求和；如题目标注为反向计分，则先按对应量表的线性规则反向（例如 1-6 量表：得分=7-原始得分）。"
+    ],
+    "subscales": [
+      {
+        "id": "neuroticism",
+        "name": "神经质",
+        "section": "五大人格",
+        "item_ids": [
+          "BF01",
+          "BF06",
+          "BF11",
+          "BF16",
+          "BF21",
+          "BF26",
+          "BF31",
+          "BF36"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "conscientiousness",
+        "name": "尽责性",
+        "section": "五大人格",
+        "item_ids": [
+          "BF02",
+          "BF07",
+          "BF12",
+          "BF17",
+          "BF22",
+          "BF27",
+          "BF32",
+          "BF37"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "agreeableness",
+        "name": "宜人性",
+        "section": "五大人格",
+        "item_ids": [
+          "BF03",
+          "BF08",
+          "BF13",
+          "BF18",
+          "BF23",
+          "BF28",
+          "BF33",
+          "BF38"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "openness",
+        "name": "开放性",
+        "section": "五大人格",
+        "item_ids": [
+          "BF04",
+          "BF09",
+          "BF14",
+          "BF19",
+          "BF24",
+          "BF29",
+          "BF34",
+          "BF39"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "extraversion",
+        "name": "外向性",
+        "section": "五大人格",
+        "item_ids": [
+          "BF05",
+          "BF10",
+          "BF15",
+          "BF20",
+          "BF25",
+          "BF30",
+          "BF35",
+          "BF40"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "tenacity",
+        "name": "坚韧",
+        "section": "心理弹性",
+        "item_ids": [
+          "RS11",
+          "RS12",
+          "RS13",
+          "RS14",
+          "RS15",
+          "RS16",
+          "RS17",
+          "RS18",
+          "RS19",
+          "RS20",
+          "RS21",
+          "RS22",
+          "RS23"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "strength",
+        "name": "力量",
+        "section": "心理弹性",
+        "item_ids": [
+          "RS01",
+          "RS05",
+          "RS07",
+          "RS08",
+          "RS09",
+          "RS10",
+          "RS24",
+          "RS25"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "optimism",
+        "name": "乐观",
+        "section": "心理弹性",
+        "item_ids": [
+          "RS02",
+          "RS03",
+          "RS04",
+          "RS06"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "resilience_total",
+        "name": "心理弹性总分",
+        "section": "心理弹性",
+        "item_ids": [
+          "RS01",
+          "RS02",
+          "RS03",
+          "RS04",
+          "RS05",
+          "RS06",
+          "RS07",
+          "RS08",
+          "RS09",
+          "RS10",
+          "RS11",
+          "RS12",
+          "RS13",
+          "RS14",
+          "RS15",
+          "RS16",
+          "RS17",
+          "RS18",
+          "RS19",
+          "RS20",
+          "RS21",
+          "RS22",
+          "RS23",
+          "RS24",
+          "RS25"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "achievement_motivation_total",
+        "name": "成就动机总分",
+        "section": "成就动机",
+        "item_ids": [
+          "AM01",
+          "AM02",
+          "AM03",
+          "AM04",
+          "AM05",
+          "AM06",
+          "AM07",
+          "AM08",
+          "AM09",
+          "AM10",
+          "AM11",
+          "AM12",
+          "AM13",
+          "AM14",
+          "AM15",
+          "AM16",
+          "AM17",
+          "AM18",
+          "AM19",
+          "AM20",
+          "AM21"
+        ],
+        "aggregation": "sum"
+      }
+    ],
+    "composites": []
+  },
+  "source_documents": [
+    {
+      "name": "附录一问卷.docx"
+    },
+    {
+      "name": "五大人格.docx"
+    },
+    {
+      "name": "心理弹性.docx"
+    }
+  ]
+}
