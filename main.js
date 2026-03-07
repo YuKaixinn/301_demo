@@ -5,11 +5,56 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const { analyzeECG, analyzeEMG, analyzeEye } = require('./utils/physio_analysis');
 
-const CACHE_DIR = 'D:\\ccho_RECORD\\cache';
+const LEGACY_DATA_ROOT = 'D:\\ccho_RECORD';
+
+function getDefaultDataRoot() {
+  try {
+    if (fs.existsSync(LEGACY_DATA_ROOT)) return LEGACY_DATA_ROOT;
+  } catch (e) {}
+  return path.join(app.getPath('documents'), 'ccho_RECORD');
+}
+
+function getDefaultPaths() {
+  const dataRoot = getDefaultDataRoot();
+  return {
+    emg: 'C:\\Users\\vrtrain2\\Desktop\\肌电软件-标准\\软件\\EmgServer采集-64位\\Release\\EmgServer.exe',
+    ecg: 'C:\\Users\\vrtrain2\\Desktop\\运动风险评估系统\\Release\\HeartCapture.exe',
+    eye: 'C:\\Users\\vrtrain2\\Desktop\\vrpack3\\CCHO_DEMO.exe',
+    game: 'D:\\soft\\wechat\\app\\Weixin\\Weixin.exe',
+    emgDataPath: path.join(dataRoot, 'EMG'),
+    ecgDataPath: path.join(dataRoot, 'ECG'),
+    eyeDataPath: path.join(dataRoot, 'eyetrack'),
+    gameDataPath: path.join(dataRoot, 'SCOREresult'),
+    cacheDir: path.join(app.getPath('userData'), 'cache'),
+    autoMaximize: false
+  };
+}
+
+function ensureDirSafe(dirPath) {
+  if (!dirPath) return;
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (e) {}
+}
+
+function ensureDataDirs(config) {
+  if (!config) return;
+  const keys = ['emgDataPath', 'ecgDataPath', 'eyeDataPath', 'gameDataPath', 'cacheDir'];
+  keys.forEach((key) => ensureDirSafe(config[key]));
+}
+
+function getCacheDir() {
+  const config = loadConfig();
+  const defaults = getDefaultPaths();
+  return (config && config.cacheDir) || defaults.cacheDir;
+}
 
 function ensureCacheDir() {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  const cacheDir = getCacheDir();
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true }) ;
   }
 }
 
@@ -34,8 +79,77 @@ function getCNISOString() {
   return parts.date + 'T' + parts.time + '+08:00';
 }
 
+function savePredictionRecord(type, subjectIdRaw, payload) {
+  ensureCacheDir();
+  const timestamp = getCNTimestampForFile();
+  const safeSubject = String(subjectIdRaw || 'unknown').trim() || 'unknown';
+  const filename = `prediction_${type}_${safeSubject}_${timestamp}.json`;
+  const filePath = path.join(getCacheDir(), filename);
+  const record = {
+    id: Date.now(),
+    subject_id: safeSubject,
+    prediction_type: type,
+    ...payload,
+    created_at: getCNISOString()
+  };
+  fs.writeFileSync(filePath, JSON.stringify(record, null, 2), 'utf-8');
+  return filePath;
+}
+
+function getCogTypeCode(label, labelText) {
+  const raw = labelText ?? label;
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/^-?\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  const map = {
+    '记忆强': 0,
+    '执行强': 1,
+    '推理强': 2
+  };
+  if (Object.prototype.hasOwnProperty.call(map, s)) return map[s];
+  return null;
+}
+
+function resolveBundledPath(relativePath) {
+  const normalized = String(relativePath || '').replace(/[\\/]+/g, path.sep);
+  const devPath = path.join(__dirname, normalized);
+  if (!app.isPackaged) return devPath;
+  const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked', normalized);
+  if (fs.existsSync(unpackedPath)) return unpackedPath;
+  return devPath;
+}
+
+function getPythonCwd() {
+  if (!app.isPackaged) return __dirname;
+  const unpackedRoot = path.join(process.resourcesPath, 'app.asar.unpacked');
+  if (fs.existsSync(unpackedRoot)) return unpackedRoot;
+  return process.resourcesPath;
+}
+
+function getPythonExecInfo() {
+  const bundledExe = resolveBundledPath(path.join('bin', 'python', 'python.exe'));
+  if (fs.existsSync(bundledExe)) {
+    const pyRoot = path.dirname(bundledExe);
+    const libPath = path.join(pyRoot, 'Lib');
+    const sitePath = path.join(libPath, 'site-packages');
+    return {
+      exe: bundledExe,
+      env: {
+        PYTHONHOME: pyRoot,
+        PYTHONPATH: [libPath, sitePath, getPythonCwd()].join(path.delimiter)
+      }
+    };
+  }
+  return { exe: 'python', env: {} };
+}
+
 function collectFeaturesForSubject(subjectIdRaw) {
-  if (!fs.existsSync(CACHE_DIR)) {
+  const cacheDir = getCacheDir();
+  if (!fs.existsSync(cacheDir)) {
     throw new Error('未找到缓存目录，请先保存数据');
   }
 
@@ -44,7 +158,7 @@ function collectFeaturesForSubject(subjectIdRaw) {
     throw new Error('被试编号为空');
   }
 
-  const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
+  const files = fs.readdirSync(cacheDir).filter(f => f.endsWith('.json'));
   if (files.length === 0) {
     throw new Error('缓存目录中没有 JSON 数据');
   }
@@ -57,7 +171,7 @@ function collectFeaturesForSubject(subjectIdRaw) {
   for (const file of files) {
     let record;
     try {
-      const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+      const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
       record = JSON.parse(content);
     } catch (e) {
       continue;
@@ -122,9 +236,48 @@ function collectFeaturesForSubject(subjectIdRaw) {
         }
       });
     } else if (file.startsWith('questionnaire_')) {
+      const basicKeys = [
+        'basic_name',
+        'basic_age',
+        'basic_gender',
+        'basic_education',
+        'basic_grade',
+        'basic_ethnicity',
+        'basic_service_years',
+        'basic_major'
+      ];
+      basicKeys.forEach(k => {
+        if (Object.prototype.hasOwnProperty.call(record, k)) {
+          row[k] = record[k];
+        }
+      });
+
       const scores = record.scores || {};
+      const metrics = record.questionnaire_metrics || {};
+      const subNamed = scores.subscales_named || {};
+      const compNamed = scores.composites_named || {};
       const psy = scores.psy_results || {};
+      const questionnaireMetricKeys = [
+        '神经质',
+        '尽责性',
+        '宜人性',
+        '开放性',
+        '外向性',
+        '坚韧',
+        '力量',
+        '乐观',
+        '心理弹性总分',
+        '成就动机'
+      ];
+      questionnaireMetricKeys.forEach(k => {
+        const val = metrics[k] ?? subNamed[k] ?? compNamed[k] ?? subNamed[k === '成就动机' ? '成就动机总分' : k];
+        if (val != null) {
+          row[k] = val;
+          row[`${k}_Psy`] = val;
+        }
+      });
       Object.keys(psy).forEach(k => {
+        if (k.includes('动机')) return;
         row[k] = psy[k];
       });
     } else if (file.startsWith('ecg_') || file.startsWith('emg_') || file.startsWith('eye_')) {
@@ -199,6 +352,12 @@ function createWindow() {
   });
  
   mainWindow.loadFile('index.html');
+  mainWindow.once('ready-to-show', () => {
+    const config = loadConfig();
+    if (config && config.autoMaximize) {
+      mainWindow.maximize();
+    }
+  });
   // mainWindow.webContents.openDevTools();
 }
 
@@ -305,10 +464,11 @@ ipcMain.on('window:close', () => {
 
 ipcMain.handle('export:unifiedCsv', async () => {
   try {
-    if (!fs.existsSync(CACHE_DIR)) {
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) {
       return { ok: false, error: '未找到缓存目录' };
     }
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(cacheDir).filter(f => f.endsWith('.json'));
     if (files.length === 0) {
       return { ok: false, error: '缓存目录中没有 JSON 数据' };
     }
@@ -325,7 +485,7 @@ ipcMain.handle('export:unifiedCsv', async () => {
     for (const file of files) {
       let record;
       try {
-        const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+        const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
         record = JSON.parse(content);
       } catch (e) {
         continue;
@@ -380,6 +540,8 @@ ipcMain.handle('export:unifiedCsv', async () => {
           'basic_gender',
           'basic_education',
           'basic_grade',
+          'basic_ethnicity',
+          'basic_service_years',
           'basic_major'
         ];
         basicKeys.forEach(k => {
@@ -399,30 +561,96 @@ ipcMain.handle('export:unifiedCsv', async () => {
         if (eduRaw) {
           const s = String(eduRaw).toLowerCase();
           let cn = '';
-          if (s === 'elementary' || s === 'primary' || s === '小学') cn = '小学';
-          else if (s === 'middle' || s === 'junior' || s === '初中') cn = '初中';
-          else if (s === 'high' || s === '高中') cn = '高中';
-          else if (s === 'bachelor' || s === '本科') cn = '本科';
-          else if (s === 'master' || s === '硕士') cn = '硕士';
-          else if (s === 'phd' || s === '博士' || s === 'doctor') cn = '博士';
-          else if (s === 'other' || s === '其他') cn = '其他';
+          const isCollege = s.includes('大专') || s.includes('专科') || s.includes('associate') || s.includes('college');
+          const isBachelor = s.includes('本科') || s.includes('bachelor');
+          const isGraduate = s.includes('研究生') || s.includes('硕士') || s.includes('博士') || s.includes('master') || s.includes('phd') || s.includes('doctor');
+          if (isCollege) cn = '大专';
+          else if (isBachelor) cn = '本科';
+          else if (isGraduate) cn = '研究生及以上';
           row.basic_grade = cn || eduRaw;
         }
 
         const scores = record.scores || {};
+        const metrics = record.questionnaire_metrics || {};
         const subNamed = scores.subscales_named || {};
         const compNamed = scores.composites_named || {};
-        Object.keys(subNamed).forEach(k => {
-          row[k] = subNamed[k];
-        });
-        Object.keys(compNamed).forEach(k => {
-          row[k] = compNamed[k];
+        const psy = scores.psy_results || {};
+        const questionnaireKeys = [
+          '神经质',
+          '尽责性',
+          '宜人性',
+          '开放性',
+          '外向性',
+          '坚韧',
+          '力量',
+          '乐观',
+          '心理弹性总分',
+          '成就动机'
+        ];
+        questionnaireKeys.forEach(k => {
+          let val = null;
+          if (Object.prototype.hasOwnProperty.call(metrics, k)) val = metrics[k];
+          else if (Object.prototype.hasOwnProperty.call(psy, `${k}_Psy`)) val = psy[`${k}_Psy`];
+          else if (Object.prototype.hasOwnProperty.call(psy, k)) val = psy[k];
+          else if (Object.prototype.hasOwnProperty.call(subNamed, k)) val = subNamed[k];
+          else if (Object.prototype.hasOwnProperty.call(compNamed, k)) val = compNamed[k];
+          else if (k === '成就动机' && Object.prototype.hasOwnProperty.call(subNamed, '成就动机总分')) {
+            val = subNamed['成就动机总分'];
+          }
+          if (val != null) row[k] = val;
         });
       } else if (file.startsWith('ecg_') || file.startsWith('emg_') || file.startsWith('eye_')) {
         const metrics = record.metrics || {};
-        Object.keys(metrics).forEach(k => {
-          row[k] = metrics[k];
-        });
+        const copyIfPresent = (dstKey, srcKey) => {
+          if (Object.prototype.hasOwnProperty.call(metrics, srcKey)) {
+            row[dstKey] = metrics[srcKey];
+          }
+        };
+
+        if (file.startsWith('ecg_')) {
+          [
+            'n_peaks_ECG',
+            'Mean_RR_ms_ECG',
+            'SDNN_ms_ECG',
+            'RMSSD_ms_ECG',
+            'pNN50_pct_ECG',
+            'HR_Mean_ECG',
+            'HR_Std_ECG',
+            'HR_Change_Rate_ECG'
+          ].forEach(k => copyIfPresent(k, k));
+        } else if (file.startsWith('emg_')) {
+          copyIfPresent('Arm_MAV', 'Arm_MAV');
+          copyIfPresent('Arm_MDF', 'Arm_MDF');
+          copyIfPresent('Arm_MPF', 'Arm_MPF');
+          copyIfPresent('Arm_Max_Amp', 'Arm_Max_Amp');
+          copyIfPresent('Arm_RMS', 'Arm_RMS');
+          copyIfPresent('Arm_iEMG', 'Arm_iEMG');
+          copyIfPresent('Neck_MAV', 'Neck_MAV');
+          copyIfPresent('Neck_MDF', 'Neck_MDF');
+          copyIfPresent('Neck_MPF', 'Neck_MPF');
+          copyIfPresent('Neck_Max_Amp', 'Neck_Max_Amp');
+          copyIfPresent('Neck_RMS', 'Neck_RMS');
+          copyIfPresent('Neck_iEMG', 'Neck_iEMG');
+        } else if (file.startsWith('eye_')) {
+          copyIfPresent('duration_sec_Eye', 'duration_sec_Eye');
+          copyIfPresent('sampling_rate_est_Eye', 'sampling_rate_est_Eye');
+          copyIfPresent('blink_count_Eye', 'blink_count_Eye');
+          copyIfPresent('short_blink_count_Eye', 'short_blink_count_Eye');
+          copyIfPresent('blink_freq_Eye', 'blink_freq_Eye');
+          copyIfPresent('blink_freq_Eye', 'blink_rate_Hz_Eye');
+          copyIfPresent('avg_blink_dur_ms_Eye', 'avg_blink_dur_ms_Eye');
+          copyIfPresent('avg_blink_dur_ms_Eye', 'blink_dur_ms_Eye');
+          copyIfPresent('fixation_count_Eye', 'fixation_count_Eye');
+          copyIfPresent('fixation_freq_Eye', 'fixation_freq_Eye');
+          copyIfPresent('fixation_freq_Eye', 'fixation_rate_Hz_Eye');
+          copyIfPresent('avg_fixation_dur_ms_Eye', 'avg_fixation_dur_ms_Eye');
+          copyIfPresent('saccade_count_Eye', 'saccade_count_Eye');
+          copyIfPresent('avg_saccade_amp_deg_Eye', 'avg_saccade_amp_deg_Eye');
+          copyIfPresent('avg_pupil_L_Eye', 'avg_pupil_L_Eye');
+          copyIfPresent('gaze_yaw_std_Eye', 'gaze_yaw_std_Eye');
+          copyIfPresent('gaze_pitch_std_Eye', 'gaze_pitch_std_Eye');
+          copyIfPresent('avg_pupil_R_Eye', 'avg_pupil_R_Eye');
+        }
       } else if (file.startsWith('game_')) {
         const map = {
           Shooting_TotalScore_Score: 'val_shooting_total',
@@ -441,6 +669,18 @@ ipcMain.handle('export:unifiedCsv', async () => {
             row[dst] = record[src];
           }
         });
+      } else if (file.startsWith('prediction_')) {
+        const predType = record.prediction_type;
+        if (predType === 'ele_level') {
+          row.ele_level_pred = record.label;
+        } else if (predType === 'cog_type') {
+          const code = record.label_code ?? getCogTypeCode(record.label, record.label_text);
+          row.cog_type_pred = code ?? null;
+        } else if (predType === 'mot_type') {
+          row.mot_type_pred = record.label;
+        } else if (predType === 'mot_level') {
+          row.mot_level_pred = record.label;
+        }
       }
     }
 
@@ -451,22 +691,33 @@ ipcMain.handle('export:unifiedCsv', async () => {
     const rows = Array.from(rowsBySubject.values());
 
     const columnDefs = [
-      { header: 'Subject_ID_Basic', key: 'subject_id' },
-      { header: '姓名_Basic', key: 'basic_name' },
-      { header: '性别_Basic', key: 'basic_gender' },
-      { header: '年龄_Basic', key: 'basic_age' },
-      { header: '学历_Basic', key: 'basic_grade' },
-      { header: '工作记忆(正确数)_Cog', key: 'wm_correct' },
-      { header: '工作记忆(时长s)_Cog', key: 'wm_time' },
-      { header: '物品再认(正确数)_Cog', key: 'obj_correct' },
-      { header: '物品再认(时长s)_Cog', key: 'obj_time' },
-      { header: 'TMT-A(正确数)_Cog', key: 'tmta_correct' },
-      { header: 'TMT-A(时长s)_Cog', key: 'tmta_time' },
-      { header: '延迟回忆(正确数)_Cog', key: 'delay_correct' },
-      { header: '延迟回忆(时长s)_Cog', key: 'delay_time' },
-      { header: '回溯测试(正确数)_Cog', key: 'nback_correct' },
-      { header: '色词干扰(正确数)_Cog', key: 'stroop_correct' },
-      { header: '语法推理(正确数)_Cog', key: 'reasoning_correct' },
+      { header: 'id', key: 'subject_id' },
+      { header: '姓名', key: 'basic_name' },
+      { header: '性别', key: 'basic_gender' },
+      { header: '民族', key: 'basic_ethnicity' },
+      { header: '年龄', key: 'basic_age' },
+      { header: '军龄', key: 'basic_service_years' },
+      { header: '学历', key: 'basic_grade' },
+      { header: '神经质', key: '神经质' },
+      { header: '尽责性', key: '尽责性' },
+      { header: '宜人性', key: '宜人性' },
+      { header: '开放性', key: '开放性' },
+      { header: '外向性', key: '外向性' },
+      { header: '坚韧', key: '坚韧' },
+      { header: '力量', key: '力量' },
+      { header: '乐观', key: '乐观' },
+      { header: '心理弹性总分', key: '心理弹性总分' },
+      { header: '成就动机', key: '成就动机' },
+      { header: '体能水平预测', key: 'ele_level_pred' },
+      { header: '认知优势预测', key: 'cog_type_pred' },
+      { header: '动机类型预测', key: 'mot_type_pred' },
+      { header: '动机水平预测', key: 'mot_level_pred' },
+      { header: 'Pre_SBP_BPHR', key: 'pre_sbp' },
+      { header: 'Pre_DBP_BPHR', key: 'pre_dbp' },
+      { header: 'Pre_HR_BPHR', key: 'pre_hr' },
+      { header: 'Post_SBP_BPHR', key: 'post_sbp' },
+      { header: 'Post_DBP_BPHR', key: 'post_dbp' },
+      { header: 'Post_HR_BPHR', key: 'post_hr' },
       { header: 'n_peaks_ECG', key: 'n_peaks_ECG' },
       { header: 'Mean_RR_ms_ECG', key: 'Mean_RR_ms_ECG' },
       { header: 'SDNN_ms_ECG', key: 'SDNN_ms_ECG' },
@@ -475,9 +726,6 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: 'HR_Mean_ECG', key: 'HR_Mean_ECG' },
       { header: 'HR_Std_ECG', key: 'HR_Std_ECG' },
       { header: 'HR_Change_Rate_ECG', key: 'HR_Change_Rate_ECG' },
-      { header: 'Resp_Mean_ECG', key: 'Resp_Mean_ECG' },
-      { header: 'Resp_Std_ECG', key: 'Resp_Std_ECG' },
-      { header: 'Resp_Change_Rate_ECG', key: 'Resp_Change_Rate_ECG' },
       { header: 'Arm_MAV_EMG', key: 'Arm_MAV' },
       { header: 'Arm_MDF_EMG', key: 'Arm_MDF' },
       { header: 'Arm_MPF_EMG', key: 'Arm_MPF' },
@@ -513,41 +761,7 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: 'Task4_Total_Score', key: 'Task4_Total_Score' },
       { header: 'Task4_Accuracy_Score', key: 'Task4_Accuracy_Score' },
       { header: 'Game5_TotalScore_Score', key: 'Game5_TotalScore_Score' },
-      { header: 'Game5_LifeSum_Score', key: 'Game5_LifeSum_Score' },
-      { header: '内部动机_Psy', key: '内部动机' },
-      { header: '整合调节_Psy', key: '整合调节' },
-      { header: '内摄调节_Psy', key: '内摄调节' },
-      { header: '外在调节_Psy', key: '外在调节' },
-      { header: '无动机_Psy', key: '无动机' },
-      { header: '认同动机_Psy', key: '认同调节' },
-      { header: '自主动机_Psy', key: '自主动机' },
-      { header: '神经质_Psy', key: '神经质' },
-      { header: '尽责性_Psy', key: '尽责性' },
-      { header: '宜人性_Psy', key: '宜人性' },
-      { header: '开放性_Psy', key: '开放性' },
-      { header: '外向性_Psy', key: '外向性' },
-      { header: '心理弹性总分_Psy', key: '心理弹性总分' },
-      { header: '坚韧_Psy', key: '坚韧' },
-      { header: '力量_Psy', key: '力量' },
-      { header: '乐观_Psy', key: '乐观' },
-      { header: '进取_Psy', key: '进取' },
-      { header: '主动_Psy', key: '主动' },
-      { header: '求精_Psy', key: '求精' },
-      { header: '坚韧.1_Psy', key: '坚韧.1' },
-      { header: '奉献_Psy', key: '奉献' },
-      { header: '乐业_Psy', key: '乐业' },
-      { header: '持续学习_Psy', key: '持续学习' },
-      { header: '30x2_Ele', key: 'run_30x2' },
-      { header: '仰卧卷腹_Ele', key: 'sit_ups' },
-      { header: '引体向上_Ele', key: 'pull_ups' },
-      { header: '3000米_Ele', key: 'run_3000' },
-      { header: '单兵训练综合成绩_Ele', key: 'composite_score' },
-      { header: 'Pre_SBP_BPHR', key: 'pre_sbp' },
-      { header: 'Pre_DBP_BPHR', key: 'pre_dbp' },
-      { header: 'Pre_HR_BPHR', key: 'pre_hr' },
-      { header: 'Post_SBP_BPHR', key: 'post_sbp' },
-      { header: 'Post_DBP_BPHR', key: 'post_dbp' },
-      { header: 'Post_HR_BPHR', key: 'post_hr' }
+      { header: 'Game5_LifeSum_Score', key: 'Game5_LifeSum_Score' }
     ];
 
     const escapeCsv = (value) => {
@@ -606,12 +820,13 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     // 2. 获取预测结果 (调用 Python 脚本)
     const runPy = (script, mode) => {
       return new Promise(resolve => {
-        const args = ['-X', 'utf8', path.join(__dirname, script)];
+        const args = ['-X', 'utf8', resolveBundledPath(script)];
         if (mode) args.push(mode);
-        
-        const py = spawn('python', args, {
+        const pyInfo = getPythonExecInfo();
+        const py = spawn(pyInfo.exe, args, {
           stdio: ['pipe', 'pipe', 'pipe'],
-          env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+          cwd: getPythonCwd(),
+          env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...pyInfo.env }
         });
         
         let stdout = '';
@@ -625,10 +840,10 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     };
 
     const [eleRes, cogRes, motTypeRes, motLevelRes] = await Promise.all([
-      runPy('predict_ele_live.py'),
-      runPy('predict_cog_type_live.py'),
-      runPy('predict_motivation_live.py', 'type'),
-      runPy('predict_motivation_live.py', 'level')
+      runPy('utils/predict_ele_live.py'),
+      runPy('utils/predict_cog_type_live.py'),
+      runPy('utils/predict_motivation_live.py', 'type'),
+      runPy('utils/predict_motivation_live.py', 'level')
     ]);
 
     // Force mapping for Motivation Type to ensure Chinese labels
@@ -699,7 +914,6 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     // Extract subscale scores from features if available (keys ending with _Psy or from raw naming)
     // Actually features has flattened keys. We need to map them back to radar dimensions.
     // Dimensions from renderer.js:
-    // Training: 内部动机, 整合调节, 内摄调节, 外在调节, 无动机, 认同动机
     // BigFive: 神经质, 尽责性, 宜人性, 开放性, 外向性
     // PsyCap: 坚韧, 力量, 乐观
     
@@ -709,7 +923,6 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     };
 
     const radarData = {
-        training: [getVal('内部动机'), getVal('整合调节'), getVal('内摄调节'), getVal('外在调节'), getVal('无动机'), getVal('认同动机')],
         bigfive: [getVal('神经质'), getVal('尽责性'), getVal('宜人性'), getVal('开放性'), getVal('外向性')],
         psycap: [getVal('坚韧'), getVal('力量'), getVal('乐观')]
     };
@@ -722,6 +935,273 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         return num.toFixed(digits);
     };
 
+    const pickFeature = (keys) => {
+        for (const k of keys) {
+            if (Object.prototype.hasOwnProperty.call(features, k)) {
+                const v = features[k];
+                if (v !== null && v !== undefined && v !== '') return v;
+            }
+        }
+        return null;
+    };
+
+    const formatValue = (val) => {
+        if (val == null || val === '') return '-';
+        const num = Number(val);
+        if (!Number.isFinite(num)) return String(val);
+        return Number.isInteger(num) ? String(num) : num.toFixed(2);
+    };
+
+    const questionnaireKeyMetrics = [
+        { label: '心理弹性总分', keys: ['心理弹性总分', '心理弹性总分_Psy'], min: 25, max: 125 },
+        { label: '成就动机总分', keys: ['成就动机总分', '成就动机', '成就动机_Psy'], min: 21, max: 105 }
+    ];
+
+    const loadMetricConfig = (fileName) => {
+        const candidates = [
+            path.join(__dirname, fileName),
+            path.join(__dirname, 'config', fileName),
+            path.join(__dirname, 'data', fileName),
+            path.join(process.cwd(), fileName)
+        ];
+        for (const filePath of candidates) {
+            try {
+                if (fs.existsSync(filePath)) {
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    return JSON.parse(content);
+                }
+            } catch (e) {}
+        }
+        return null;
+    };
+
+    const normalizeMetricGroups = (config, fallbackTitle) => {
+        if (!config) return [];
+        if (Array.isArray(config)) {
+            return [{ title: fallbackTitle, items: config }];
+        }
+        const groupArray = config.groups || config.sections || config.tables || null;
+        if (Array.isArray(groupArray)) {
+            return groupArray.map(group => ({
+                title: group.title || group.name || group.label || fallbackTitle,
+                items: group.items || group.metrics || group.rows || group.list || []
+            }));
+        }
+        const items = config.items || config.metrics || config.rows || config.list || config.data || [];
+        if (Array.isArray(items)) {
+            return [{ title: config.title || config.name || fallbackTitle, items }];
+        }
+        return [];
+    };
+
+    const physioIndexConfig = loadMetricConfig('physiological_index.json');
+    const ecgMetricsConfig = loadMetricConfig('ecg_metrics.json');
+    const emgMetricsConfig = loadMetricConfig('emg_metrics.json');
+
+    const fallbackEcgMetrics = [
+        { label: 'n_peaks_ECG', keys: ['n_peaks_ECG'] },
+        { label: 'Mean_RR_ms_ECG', keys: ['Mean_RR_ms_ECG'] },
+        { label: 'SDNN_ms_ECG', keys: ['SDNN_ms_ECG'] },
+        { label: 'RMSSD_ms_ECG', keys: ['RMSSD_ms_ECG'] },
+        { label: 'pNN50_pct_ECG', keys: ['pNN50_pct_ECG'] },
+        { label: 'HR_Mean_ECG', keys: ['HR_Mean_ECG'] },
+        { label: 'HR_Std_ECG', keys: ['HR_Std_ECG'] },
+        { label: 'HR_Change_Rate_ECG', keys: ['HR_Change_Rate_ECG'] }
+    ];
+
+    const fallbackEmgMetrics = [
+        { label: 'Arm_MAV_EMG', keys: ['Arm_MAV_EMG', 'Arm_MAV'] },
+        { label: 'Arm_MDF_EMG', keys: ['Arm_MDF_EMG', 'Arm_MDF'] },
+        { label: 'Arm_MPF_EMG', keys: ['Arm_MPF_EMG', 'Arm_MPF'] },
+        { label: 'Arm_Max_Amp_EMG', keys: ['Arm_Max_Amp_EMG', 'Arm_Max_Amp'] },
+        { label: 'Arm_RMS_EMG', keys: ['Arm_RMS_EMG', 'Arm_RMS'] },
+        { label: 'Arm_iEMG_EMG', keys: ['Arm_iEMG_EMG', 'Arm_iEMG'] },
+        { label: 'Neck_MAV_EMG', keys: ['Neck_MAV_EMG', 'Neck_MAV'] },
+        { label: 'Neck_MDF_EMG', keys: ['Neck_MDF_EMG', 'Neck_MDF'] },
+        { label: 'Neck_MPF_EMG', keys: ['Neck_MPF_EMG', 'Neck_MPF'] },
+        { label: 'Neck_Max_Amp_EMG', keys: ['Neck_Max_Amp_EMG', 'Neck_Max_Amp'] },
+        { label: 'Neck_RMS_EMG', keys: ['Neck_RMS_EMG', 'Neck_RMS'] },
+        { label: 'Neck_iEMG_EMG', keys: ['Neck_iEMG_EMG', 'Neck_iEMG'] }
+    ];
+
+    const fallbackPhysioIndex = [
+        { label: 'duration_sec_Eye', keys: ['duration_sec_Eye'] },
+        { label: 'sampling_rate_est_Eye', keys: ['sampling_rate_est_Eye'] },
+        { label: 'blink_count_Eye', keys: ['blink_count_Eye'] },
+        { label: 'short_blink_count_Eye', keys: ['short_blink_count_Eye'] },
+        { label: 'blink_freq_Eye', keys: ['blink_freq_Eye'] },
+        { label: 'avg_blink_dur_ms_Eye', keys: ['avg_blink_dur_ms_Eye'] },
+        { label: 'fixation_count_Eye', keys: ['fixation_count_Eye'] },
+        { label: 'fixation_freq_Eye', keys: ['fixation_freq_Eye'] },
+        { label: 'avg_fixation_dur_ms_Eye', keys: ['avg_fixation_dur_ms_Eye'] },
+        { label: 'saccade_count_Eye', keys: ['saccade_count_Eye'] },
+        { label: 'avg_saccade_amp_deg_Eye', keys: ['avg_saccade_amp_deg_Eye'] },
+        { label: 'avg_pupil_L_Eye', keys: ['avg_pupil_L_Eye'] },
+        { label: 'gaze_yaw_std_Eye', keys: ['gaze_yaw_std_Eye'] },
+        { label: 'gaze_pitch_std_Eye', keys: ['gaze_pitch_std_Eye'] },
+        { label: 'avg_pupil_R_Eye', keys: ['avg_pupil_R_Eye'] }
+    ];
+
+    const gameMetrics = [
+        { label: 'Shooting_TotalScore_Score', keys: ['Shooting_TotalScore_Score'] },
+        { label: 'Shooting_Accuracy_Score', keys: ['Shooting_Accuracy_Score'] },
+        { label: 'Shooting_AvgScore_Score', keys: ['Shooting_AvgScore_Score'] },
+        { label: 'Task4_BallAndRing_Score', keys: ['Task4_BallAndRing_Score'] },
+        { label: 'Task4_NumberLine_Score', keys: ['Task4_NumberLine_Score'] },
+        { label: 'Task4_Total_Score', keys: ['Task4_Total_Score'] },
+        { label: 'Task4_Accuracy_Score', keys: ['Task4_Accuracy_Score'] },
+        { label: 'Game5_TotalScore_Score', keys: ['Game5_TotalScore_Score'] },
+        { label: 'Game5_LifeSum_Score', keys: ['Game5_LifeSum_Score'] }
+    ];
+
+    const renderMetricRows = (metrics) => {
+        return metrics.map(m => {
+            const value = formatValue(pickFeature(m.keys));
+            return `<tr><td>${m.label}</td><td>${value}</td></tr>`;
+        }).join('');
+    };
+
+    const renderMetricCards = (metrics) => {
+        return metrics.map(m => {
+            const raw = pickFeature(m.keys);
+            const num = Number(raw);
+            const valueText = formatValue(raw);
+            const valid = Number.isFinite(num);
+            const ratioRaw = valid && m.max !== m.min ? (num - m.min) / (m.max - m.min) : 0;
+            const ratio = Math.max(0, Math.min(1, ratioRaw));
+            const markerLeft = (ratio * 100).toFixed(2);
+            return `
+              <div class="metric-card">
+                <div class="metric-header">
+                  <span class="metric-label">${m.label}</span>
+                  <span class="metric-value">${valueText}</span>
+                </div>
+                <div class="metric-bar">
+                  <span class="metric-marker" style="left:${markerLeft}%"></span>
+                </div>
+                <div class="metric-scale">
+                  <span>最低 ${m.min}</span>
+                  <span>最高 ${m.max}</span>
+                </div>
+              </div>
+            `;
+        }).join('');
+    };
+
+    const normalizeGender = (raw) => {
+        if (raw == null) return '';
+        const g = String(raw).toLowerCase();
+        if (g === 'male' || g === 'm' || g === '男') return '男';
+        if (g === 'female' || g === 'f' || g === '女') return '女';
+        return String(raw);
+    };
+
+    const genderDisplay = normalizeGender(features.basic_gender);
+
+    const normalizeEducation = (raw) => {
+        if (raw == null) return '';
+        const s = String(raw).toLowerCase();
+        const isCollege = s.includes('大专') || s.includes('专科') || s.includes('associate') || s.includes('college');
+        const isBachelor = s.includes('本科') || s.includes('bachelor');
+        const isGraduate = s.includes('研究生') || s.includes('硕士') || s.includes('博士') || s.includes('master') || s.includes('phd') || s.includes('doctor');
+        if (isCollege) return '大专';
+        if (isBachelor) return '本科';
+        if (isGraduate) return '研究生及以上';
+        return String(raw);
+    };
+
+    const educationDisplay = normalizeEducation(features.basic_education || features.basic_grade);
+
+    const getMetricKeys = (item) => {
+        if (Array.isArray(item.keys)) return item.keys;
+        const key = item.value_key || item.key || item.id || item.metric || item.name || item.label || item.title;
+        if (!key) return [];
+        return [key, `${key}_ECG`, `${key}_EMG`, `${key}_Eye`];
+    };
+
+    const formatRange = (item) => {
+        const direct = item.range || item.normal_range || item.ref_range || item.reference || item.ref;
+        if (direct) return String(direct);
+        if (item.min != null && item.max != null) return `${item.min} - ${item.max}`;
+        return '';
+    };
+
+    const getLatestCacheRecord = (prefix) => {
+        const cacheDir = getCacheDir();
+        if (!fs.existsSync(cacheDir)) return null;
+        const files = fs.readdirSync(cacheDir).filter(f => f.startsWith(prefix + '_' + subjectId + '_') && f.endsWith('.json'));
+        if (files.length === 0) return null;
+        files.sort();
+        const target = files[files.length - 1];
+        try {
+            const content = fs.readFileSync(path.join(cacheDir, target), 'utf-8');
+            return JSON.parse(content);
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const downsample = (arr, maxPoints) => {
+        if (!Array.isArray(arr)) return [];
+        if (arr.length <= maxPoints) return arr;
+        const out = [];
+        const step = arr.length / maxPoints;
+        for (let i = 0; i < maxPoints; i++) {
+            out.push(arr[Math.floor(i * step)]);
+        }
+        return out;
+    };
+
+    const ecgRecord = getLatestCacheRecord('ecg');
+    const emgRecord = getLatestCacheRecord('emg');
+    const eyeRecord = getLatestCacheRecord('eye');
+
+    const renderMetricTable = (title, metricsObj) => {
+        const rows = metricsObj ? Object.entries(metricsObj).map(([key, value]) => {
+            const valStr = formatValue(value);
+            return `<tr><td>${key}</td><td>${valStr}</td></tr>`;
+        }).join('') : '';
+
+        return `
+          <div class="result-card avoid-break">
+            <h3>${title}</h3>
+            <table>
+              <thead>
+                <tr><th>指标名称</th><th>数值</th></tr>
+              </thead>
+              <tbody>
+                ${rows || `<tr><td colspan="2">暂无数据</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        `;
+    };
+
+    const buildPhysioTablesHtml = () => {
+        let html = '';
+        html += renderMetricTable('ECG 心电指标 (ECG Metrics)', ecgRecord ? ecgRecord.metrics : {});
+        html += renderMetricTable('EMG 肌电指标 (EMG Metrics)', emgRecord ? emgRecord.metrics : {});
+        html += renderMetricTable('眼动指标 (Eye Metrics)', eyeRecord ? eyeRecord.metrics : {});
+        return html;
+    };
+
+    const physioTablesHtml = buildPhysioTablesHtml();
+
+    const ecgAnalysis = ecgRecord && ecgRecord.analysis ? ecgRecord.analysis : ecgRecord;
+    const emgAnalysis = emgRecord && emgRecord.analysis ? emgRecord.analysis : emgRecord;
+    const eyeAnalysis = eyeRecord && eyeRecord.analysis ? eyeRecord.analysis : eyeRecord;
+
+    const ecgWaveData = downsample(ecgAnalysis && Array.isArray(ecgAnalysis.voltage) ? ecgAnalysis.voltage : [], 800);
+    const emgWaveData = downsample(emgAnalysis && Array.isArray(emgAnalysis.voltage) ? emgAnalysis.voltage : [], 800);
+    const ecgWaveAvailable = ecgWaveData.length > 0;
+    const emgWaveAvailable = emgWaveData.length > 0;
+    const ecgWaveBox = ecgWaveAvailable
+        ? `<div class="chart-box signal-box"><div class="chart-title">ECG 波形</div><div id="chart-ecg-wave" class="chart-canvas"></div></div>`
+        : `<div class="chart-box signal-box"><div class="chart-title">ECG 波形</div><div class="empty-chart">暂无数据</div></div>`;
+    const emgWaveBox = emgWaveAvailable
+        ? `<div class="chart-box signal-box"><div class="chart-title">EMG 波形</div><div id="chart-emg-wave" class="chart-canvas"></div></div>`
+        : `<div class="chart-box signal-box"><div class="chart-title">EMG 波形</div><div class="empty-chart">暂无数据</div></div>`;
+
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="zh">
@@ -729,33 +1209,52 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         <meta charset="UTF-8">
         <title>综合分析报告 - ${subjectId}</title>
         <style>
-          body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; background: #fff; }
-          h1 { text-align: center; color: #0078d7; border-bottom: 2px solid #0078d7; padding-bottom: 15px; margin-bottom: 30px; }
-          h2 { color: #0f172a; margin-top: 40px; border-left: 6px solid #0078d7; padding-left: 12px; font-size: 22px; background: #f1f5f9; padding: 12px; border-radius: 0 8px 8px 0; }
-          h3 { color: #334155; margin-top: 25px; font-size: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-          .meta-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; }
+          body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; padding: 20px; color: #333; max-width: 820px; margin: 0 auto; background: #fff; }
+          h1 { text-align: center; color: #0078d7; border-bottom: 2px solid #0078d7; padding-bottom: 8px; margin-bottom: 12px; }
+          h2 { color: #0f172a; margin-top: 16px; border-left: 5px solid #0078d7; padding-left: 10px; font-size: 18px; background: #f1f5f9; padding: 8px; border-radius: 0 6px 6px 0; }
+          h3 { color: #334155; margin-top: 8px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+          .meta-info { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
           .meta-item { display: flex; flex-direction: column; }
           .meta-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
           .meta-value { font-size: 16px; font-weight: 600; color: #0f172a; }
           
-          .result-section { display: flex; gap: 30px; margin-bottom: 30px; page-break-inside: avoid; }
-          .result-card { flex: 1; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); background: #fff; }
+          .result-section { display: flex; gap: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+          .result-card { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; box-shadow: 0 1px 2px -1px rgba(0, 0, 0, 0.05); background: #fff; }
           
           .highlight { font-weight: bold; color: #0078d7; font-size: 1.2em; }
-          .chart-container { width: 100%; height: 300px; margin: 15px 0; }
-          .chart-row { display: flex; gap: 20px; flex-wrap: wrap; }
-          .chart-box { flex: 1; min-width: 250px; height: 300px; border: 1px solid #f1f5f9; border-radius: 8px; padding: 10px; }
+          .chart-container { width: 100%; height: 200px; margin: 6px 0; }
+          .chart-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+          .chart-column { display: flex; flex-direction: column; gap: 8px; }
+          .chart-box { flex: 1; min-width: 220px; height: 220px; border: 1px solid #f1f5f9; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; page-break-inside: avoid; }
+          .signal-box { min-width: 300px; height: 230px; }
+          .questionnaire-radar-row .chart-box { min-width: 260px; height: 290px; }
+          .questionnaire-radar-row .chart-canvas { min-height: 250px; }
+          .chart-title { font-size: 13px; color: #334155; font-weight: 600; margin: 2px 0 0 4px; }
+          .empty-chart { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; background: #f8fafc; border-radius: 6px; }
+          .chart-canvas { width: 100%; height: 100%; flex: 1; }
+          .chart-image { width: 100%; height: 100%; object-fit: contain; display: block; }
+          .chart-small { width: 130px; height: 130px; }
+          .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+          .metric-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; }
+          .metric-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+          .metric-label { font-size: 13px; color: #334155; font-weight: 600; }
+          .metric-value { font-size: 18px; color: #0f172a; font-weight: 700; }
+          .metric-bar { position: relative; height: 16px; border-radius: 9999px; overflow: hidden; background: linear-gradient(to right, #ef4444 0%, #ef4444 33.333%, #f59e0b 33.333%, #f59e0b 66.666%, #10b981 66.666%, #10b981 100%); }
+          .metric-marker { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 14px; height: 14px; background: #111827; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15); }
+          .metric-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #64748b; }
           
-          .guidance-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 4px; margin-top: 15px; }
-          .guidance-title { color: #1e40af; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-          .guidance-text { color: #1e3a8a; font-size: 14px; line-height: 1.6; }
+          .guidance-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px; border-radius: 4px; margin-top: 10px; }
+          .guidance-title { color: #1e40af; font-weight: bold; margin-bottom: 4px; font-size: 13px; }
+          .guidance-text { color: #1e3a8a; font-size: 13px; line-height: 1.5; }
           
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-          th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+          th, td { border: 1px solid #e2e8f0; padding: 6px 6px; text-align: left; }
           th { background: #f8fafc; color: #475569; font-weight: 600; }
+          .avoid-break { page-break-inside: avoid; }
+          .page-break { page-break-before: always; break-before: page; }
           tr:nth-child(even) { background: #fcfcfc; }
           
-          .footer { margin-top: 60px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+          .footer { margin-top: 18px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
           
           @media print {
             body { padding: 0; max-width: 100%; }
@@ -773,146 +1272,99 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         <div class="meta-info">
           <div class="meta-item"><span class="meta-label">被试编号 (ID)</span><span class="meta-value">${subjectId}</span></div>
           <div class="meta-item"><span class="meta-label">姓名 (Name)</span><span class="meta-value">${features.basic_name || '-'}</span></div>
-          <div class="meta-item"><span class="meta-label">性别 (Gender)</span><span class="meta-value">${features.basic_gender || '-'}</span></div>
+          <div class="meta-item"><span class="meta-label">性别 (Gender)</span><span class="meta-value">${genderDisplay || '-'}</span></div>
+          <div class="meta-item"><span class="meta-label">民族 (Ethnicity)</span><span class="meta-value">${features.basic_ethnicity || '-'}</span></div>
           <div class="meta-item"><span class="meta-label">年龄 (Age)</span><span class="meta-value">${features.basic_age || '-'}</span></div>
-          <div class="meta-item"><span class="meta-label">学历 (Education)</span><span class="meta-value">${features.basic_grade || '-'}</span></div>
+          <div class="meta-item"><span class="meta-label">军龄 (Service Years)</span><span class="meta-value">${features.basic_service_years || '-'}</span></div>
+          <div class="meta-item"><span class="meta-label">学历 (Education)</span><span class="meta-value">${educationDisplay || '-'}</span></div>
           <div class="meta-item"><span class="meta-label">报告日期 (Date)</span><span class="meta-value">${new Date().toLocaleDateString()}</span></div>
         </div>
 
         <h2>1. 核心评估与指导 (Core Assessment & Guidance)</h2>
         
-        <!-- 体能 -->
-        <div class="result-section">
-            <div class="result-card">
-              <h3>🏃 体能水平 (Physical Fitness)</h3>
-              <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <div>
-                      <p>预测等级：<span class="highlight">${eleRes.label_text || '未知'}</span></p>
-                      <p>高水平概率：${(eleRes.prob_high * 100).toFixed(1)}%</p>
-                  </div>
-                  <div id="chart-ele" style="width: 150px; height: 150px;"></div>
-              </div>
-              <div class="guidance-box">
-                <div class="guidance-title">💡 训练指导建议</div>
-                <div class="guidance-text">${getGuidance('ele', eleRes.label, eleRes.label_text)}</div>
-              </div>
-            </div>
-            
-            <!-- 认知 -->
-            <div class="result-card">
-              <h3>🧠 认知优势 (Cognitive Profile)</h3>
-              <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <div>
-                      <p>优势类型：<span class="highlight">${cogRes.label_text || '未知'}</span></p>
-                  </div>
-                  <div id="chart-cog" style="width: 150px; height: 150px;"></div>
-              </div>
-              <div class="guidance-box">
-                <div class="guidance-title">💡 岗位匹配建议</div>
-                <div class="guidance-text">${getGuidance('cog', cogRes.label, cogRes.label_text)}</div>
-              </div>
-            </div>
-        </div>
-
-        <!-- 动机 -->
-        <div class="result-section">
-            <div class="result-card">
-              <h3>🔥 动机特征 (Motivation)</h3>
-              <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <div>
-                      <p>主导类型：<span class="highlight">${finalMotLabel}</span></p>
-                      <p>自主动机水平：<span class="highlight">${motLevelRes.label_text || '未知'}</span> (Score: ${motLevelRes.score?.toFixed(2)})</p>
-                  </div>
-                  <div id="chart-mot" style="width: 150px; height: 150px;"></div>
-              </div>
-              <div class="guidance-box">
-                <div class="guidance-title">💡 心理激励建议</div>
-                <div class="guidance-text">
-                    ${getGuidance('mot_type', motTypeRes.label, finalMotLabel)}<br>
-                    ${getGuidance('mot_level', motLevelRes.label, motLevelRes.label_text)}
+        <div class="avoid-break">
+          <!-- 体能 -->
+          <div class="result-section">
+              <div class="result-card">
+                <h3>🏃 体能水平 (Physical Fitness)</h3>
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <p>预测等级：<span class="highlight">${eleRes.label_text || '未知'}</span></p>
+                        <p>高水平概率：${(eleRes.prob_high * 100).toFixed(1)}%</p>
+                    </div>
+                    <div id="chart-ele" class="chart-canvas chart-small"></div>
+                </div>
+                <div class="guidance-box">
+                  <div class="guidance-title">💡 训练指导建议</div>
+                  <div class="guidance-text">${getGuidance('ele', eleRes.label, eleRes.label_text)}</div>
                 </div>
               </div>
-            </div>
+              
+              <!-- 认知 -->
+              <div class="result-card">
+                <h3>🧠 认知优势 (Cognitive Profile)</h3>
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <p>优势类型：<span class="highlight">${cogRes.label_text || '未知'}</span></p>
+                    </div>
+                    <div id="chart-cog" class="chart-canvas chart-small"></div>
+                </div>
+                <div class="guidance-box">
+                  <div class="guidance-title">💡 岗位匹配建议</div>
+                  <div class="guidance-text">${getGuidance('cog', cogRes.label, cogRes.label_text)}</div>
+                </div>
+              </div>
+          </div>
+
+          <!-- 动机 -->
+          <div class="result-section">
+              <div class="result-card">
+                <h3>🔥 动机特征 (Motivation)</h3>
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <p>主导类型：<span class="highlight">${finalMotLabel}</span></p>
+                        <p>自主动机水平：<span class="highlight">${motLevelRes.label_text || '未知'}</span> (Score: ${motLevelRes.score?.toFixed(2)})</p>
+                    </div>
+                    <div id="chart-mot" class="chart-canvas chart-small"></div>
+                </div>
+                <div class="guidance-box">
+                  <div class="guidance-title">💡 心理激励建议</div>
+                  <div class="guidance-text">
+                      ${getGuidance('mot_type', motTypeRes.label, finalMotLabel)}<br>
+                      ${getGuidance('mot_level', motLevelRes.label, motLevelRes.label_text)}
+                  </div>
+                </div>
+              </div>
+          </div>
         </div>
 
+        <div class="page-break"></div>
         <h2>2. 问卷测评画像 (Questionnaire Profile)</h2>
-        <div class="chart-row">
-            <div class="chart-box" id="radar-training"></div>
-            <div class="chart-box" id="radar-bigfive"></div>
-            <div class="chart-box" id="radar-psycap"></div>
+        <div class="chart-row questionnaire-radar-row avoid-break">
+            <div class="chart-box"><div class="chart-title">大五人格雷达</div><div class="chart-canvas" id="radar-bigfive"></div></div>
+            <div class="chart-box"><div class="chart-title">心理弹性雷达</div><div class="chart-canvas" id="radar-psycap"></div></div>
         </div>
-        <table>
-            <tr>
-                <th>维度</th><th>内部动机</th><th>整合调节</th><th>内摄调节</th><th>外在调节</th><th>无动机</th><th>认同调节</th>
-            </tr>
-            <tr>
-                <td>得分</td>
-                <td>${getVal('内部动机')}</td><td>${getVal('整合调节')}</td><td>${getVal('内摄调节')}</td>
-                <td>${getVal('外在调节')}</td><td>${getVal('无动机')}</td><td>${getVal('认同动机')}</td>
-            </tr>
-        </table>
+        <div class="metric-grid">
+            ${renderMetricCards(questionnaireKeyMetrics)}
+        </div>
 
         <h2>3. 生理指标分析 (Physiological Analysis)</h2>
-        <div class="result-card">
-          <table>
-            <thead>
-                 <tr><th colspan="2">ECG 心电指标</th><th colspan="2">EMG 肌电指标 (手臂)</th></tr>
-             </thead>
-             <tbody>
-                 <tr><td>静息心率 (Pre HR)</td><td>${safeFixed(features.pre_hr, 0)} bpm</td><td>RMS (均方根)</td><td>${safeFixed(features.Arm_RMS_EMG)}</td></tr>
-                 <tr><td>心率变异性 (SDNN)</td><td>${safeFixed(features.SDNN_ms_ECG)} ms</td><td>iEMG (积分肌电)</td><td>${safeFixed(features.Arm_iEMG_EMG)}</td></tr>
-                 <tr><td>RMSSD</td><td>${safeFixed(features.RMSSD_ms_ECG)} ms</td><td>MDF (中值频率)</td><td>${safeFixed(features.Arm_MDF_EMG)} Hz</td></tr>
-                 <tr><td>pNN50</td><td>${safeFixed(features.pNN50_pct_ECG)} %</td><td>Max Amp (最大幅值)</td><td>${safeFixed(features.Arm_Max_Amp_EMG)}</td></tr>
-             </tbody>
-          </table>
-          <table style="margin-top:10px;">
-             <thead>
-                <tr><th colspan="4">眼动追踪指标 (Eye Tracking)</th></tr>
-             </thead>
-             <tbody>
-                <tr>
-                    <td>眨眼频率 (Blink Rate)</td><td>${safeFixed(features.blink_rate_Hz_Eye)} Hz</td>
-                    <td>注视时长 (Fixation Dur)</td><td>${safeFixed(features.avg_fixation_dur_ms_Eye)} ms</td>
-                </tr>
-                <tr>
-                    <td>扫视幅度 (Saccade Amp)</td><td>${safeFixed(features.avg_saccade_amp_deg_Eye)} deg</td>
-                    <td>瞳孔直径 (Pupil Diam)</td><td>${safeFixed(features.avg_pupil_diam_mm_Eye)} mm</td>
-                </tr>
-             </tbody>
-          </table>
+        ${physioTablesHtml}
+        <div class="result-card avoid-break">
+          ${ecgWaveBox}
+        </div>
+        <div class="result-card avoid-break">
+          ${emgWaveBox}
         </div>
 
-        <h2>4. 认知与游戏表现 (Cognitive & Game Performance)</h2>
+        <h2>4. 游戏成绩分析 (Game Performance)</h2>
         <div class="result-card">
           <table>
             <thead>
-                <tr><th>测试项目</th><th>关键指标 1</th><th>关键指标 2</th><th>综合评价</th></tr>
+              <tr><th>指标</th><th>数值</th></tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>工作记忆 (N-Back/WM)</td>
-                    <td>正确数: ${features.wm_correct || '-'}</td>
-                    <td>反应时: ${features.wm_time || '-'} s</td>
-                    <td>-</td>
-                </tr>
-                <tr>
-                    <td>注意力 (TMT-A)</td>
-                    <td>耗时: ${features.tmta_time || '-'} s</td>
-                    <td>正确数: ${features.tmta_correct || '-'}</td>
-                    <td>-</td>
-                </tr>
-                <tr>
-                    <td>模拟射击 (Shooting)</td>
-                    <td>总分: ${features.Shooting_TotalScore_Score || '-'}</td>
-                    <td>命中率: ${features.Shooting_Accuracy_Score || '-'}</td>
-                    <td>均分: ${features.Shooting_AvgScore_Score || '-'}</td>
-                </tr>
-                <tr>
-                    <td>多任务协同 (Task4)</td>
-                    <td>总分: ${features.Task4_Total_Score || '-'}</td>
-                    <td>准确率: ${features.Task4_Accuracy_Score || '-'}</td>
-                    <td>追踪分: ${features.Task4_BallAndRing_Score || '-'}</td>
-                </tr>
+              ${renderMetricRows(gameMetrics)}
             </tbody>
           </table>
         </div>
@@ -922,85 +1374,163 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         </div>
 
         <script>
-          // Helper to init chart
-          function initRadar(id, title, indicator, data, color) {
+          const expectedCharts = ${5 + (ecgWaveAvailable ? 1 : 0) + (emgWaveAvailable ? 1 : 0)};
+          const readyIds = new Set();
+          const markReadyById = (id) => {
+            if (readyIds.has(id)) return;
+            readyIds.add(id);
+            if (readyIds.size >= expectedCharts) window.__chartsReady = true;
+          };
+          if (expectedCharts === 0) window.__chartsReady = true;
+          const startRender = () => {
+            const renderChartToImage = (id, option) => {
               const dom = document.getElementById(id);
-              if(!dom) return;
-              const chart = echarts.init(dom);
-              chart.setOption({
-                title: { text: title, left: 'center', textStyle: { fontSize: 14 } },
-                radar: { 
-                    indicator: indicator,
-                    radius: '65%',
-                    center: ['50%', '55%']
-                },
-                series: [{
-                  type: 'radar',
-                  data: [{ value: data, name: title }],
-                  areaStyle: { opacity: 0.3, color: color },
-                  lineStyle: { color: color },
-                  itemStyle: { color: color }
-                }]
-              });
-          }
+              if (!dom) {
+                markReadyById(id);
+                return;
+              }
+              const resolveSize = () => {
+                const rect = dom.getBoundingClientRect();
+                let width = rect.width;
+                let height = rect.height;
+                if (width < 10 || height < 10) {
+                  const parent = dom.parentElement;
+                  if (parent) {
+                    const prect = parent.getBoundingClientRect();
+                    width = Math.max(width, prect.width - 16);
+                    height = Math.max(height, prect.height - 36);
+                  }
+                }
+                width = Math.max(width, 260);
+                height = Math.max(height, 180);
+                dom.style.width = width + 'px';
+                dom.style.height = height + 'px';
+                return { width, height };
+              };
+              const renderOnce = () => {
+                try {
+                  const size = resolveSize();
+                  const chart = echarts.init(dom, null, { renderer: 'canvas' });
+                  const finalOption = option || {};
+                  finalOption.animation = false;
+                  if (Array.isArray(finalOption.series)) {
+                    finalOption.series = finalOption.series.map(s => ({ ...s, animation: false }));
+                  }
+                  chart.setOption(finalOption, true);
+                  chart.resize(size);
+                  const imgData = chart.getDataURL({ type: 'png', pixelRatio: 3, backgroundColor: '#fff' });
+                  chart.dispose();
+                  const imgEl = new Image();
+                  imgEl.className = 'chart-image';
+                  imgEl.onload = () => {
+                    dom.innerHTML = '';
+                    dom.appendChild(imgEl);
+                    markReadyById(id);
+                  };
+                  imgEl.onerror = () => {
+                    dom.innerHTML = '<div class="empty-chart">图形渲染失败</div>';
+                    markReadyById(id);
+                  };
+                  imgEl.src = imgData;
+                } catch (e) {
+                  dom.innerHTML = '<div class="empty-chart">图形渲染失败</div>';
+                  markReadyById(id);
+                }
+              };
+              requestAnimationFrame(() => requestAnimationFrame(renderOnce));
+            };
 
-          // 1. Prediction Charts
-          const eleChart = echarts.init(document.getElementById('chart-ele'));
-          eleChart.setOption({
-            series: [{
-              type: 'gauge',
-              max: 1,
-              radius: '90%',
-              detail: { formatter: '{value}', fontSize: 14 },
-              axisLine: { lineStyle: { width: 8 } },
-              splitLine: { length: 8 },
-              data: [{ value: ${(eleRes.prob_high || 0).toFixed(2)}, name: '高水平概率' }]
-            }]
-          });
+            const rData = ${JSON.stringify(radarData)};
 
-          const cogChart = echarts.init(document.getElementById('chart-cog'));
-          cogChart.setOption({
-            radar: { indicator: ${JSON.stringify(Object.keys(cogRes.probs || {}).map(k => ({name: k, max: 1})))} },
-            series: [{
-              type: 'radar',
-              data: [{ value: ${JSON.stringify(Object.values(cogRes.probs || {}))}, name: '认知分布' }]
-            }]
-          });
+            renderChartToImage('chart-ele', {
+              series: [{
+                type: 'gauge',
+                max: 1,
+                radius: '90%',
+                detail: { formatter: '{value}', fontSize: 14 },
+                axisLine: { lineStyle: { width: 8 } },
+                splitLine: { length: 8 },
+                data: [{ value: ${(eleRes.prob_high || 0).toFixed(2)}, name: '高水平概率' }]
+              }]
+            });
 
-          const motChart = echarts.init(document.getElementById('chart-mot'));
-          motChart.setOption({
-            radar: { indicator: ${JSON.stringify(Object.keys(motTypeRes.probs || {}).map(k => ({name: k, max: 1})))} },
-            series: [{
-              type: 'radar',
-              data: [{ value: ${JSON.stringify(Object.values(motTypeRes.probs || {}))}, name: '动机分布' }]
-            }]
-          });
+            renderChartToImage('chart-cog', {
+              radar: { indicator: ${JSON.stringify(Object.keys(cogRes.probs || {}).map(k => ({name: k, max: 1})))} },
+              series: [{
+                type: 'radar',
+                data: [{ value: ${JSON.stringify(Object.values(cogRes.probs || {}))}, name: '认知分布' }]
+              }]
+            });
 
-          // 2. Questionnaire Profile Charts
-          const rData = ${JSON.stringify(radarData)};
-          
-          initRadar('radar-training', '训练动机 (Motivation)', 
-            [
-                {name: '内部', max: 20}, {name: '整合', max: 20}, {name: '内摄', max: 20},
-                {name: '外在', max: 20}, {name: '无动机', max: 20}, {name: '认同', max: 15}
-            ],
-            rData.training, '#2563eb'
-          );
+            renderChartToImage('chart-mot', {
+              radar: { indicator: ${JSON.stringify(Object.keys(motTypeRes.probs || {}).map(k => ({name: k, max: 1})))} },
+              series: [{
+                type: 'radar',
+                data: [{ value: ${JSON.stringify(Object.values(motTypeRes.probs || {}))}, name: '动机分布' }]
+              }]
+            });
 
-          initRadar('radar-bigfive', '大五人格 (Big Five)', 
-            [
+            renderChartToImage('radar-bigfive', {
+              radar: { indicator: [
                 {name: '神经质', max: 48}, {name: '尽责性', max: 48}, {name: '宜人性', max: 48},
                 {name: '开放性', max: 48}, {name: '外向性', max: 48}
-            ],
-            rData.bigfive, '#7c3aed'
-          );
+              ], radius: '65%', center: ['50%', '55%'] },
+              series: [{
+                type: 'radar',
+                data: [{ value: rData.bigfive, name: '大五人格' }],
+                areaStyle: { opacity: 0.3, color: '#7c3aed' },
+                lineStyle: { color: '#7c3aed' },
+                itemStyle: { color: '#7c3aed' }
+              }]
+            });
 
-          initRadar('radar-psycap', '心理弹性 (PsyCap)', 
-            [
+            renderChartToImage('radar-psycap', {
+              radar: { indicator: [
                 {name: '坚韧', max: 65}, {name: '力量', max: 40}, {name: '乐观', max: 20}
-            ],
-            rData.psycap, '#059669'
-          );
+              ], radius: '65%', center: ['50%', '55%'] },
+              series: [{
+                type: 'radar',
+                data: [{ value: rData.psycap, name: '心理弹性' }],
+                areaStyle: { opacity: 0.3, color: '#059669' },
+                lineStyle: { color: '#059669' },
+                itemStyle: { color: '#059669' }
+              }]
+            });
+
+            const ecgWave = ${JSON.stringify(ecgWaveData)};
+            if (ecgWave.length) {
+              renderChartToImage('chart-ecg-wave', {
+                xAxis: { type: 'category', show: false, data: ecgWave.map((_, i) => i) },
+                yAxis: { type: 'value', show: true },
+                grid: { left: 30, right: 10, top: 10, bottom: 20 },
+                series: [{ type: 'line', data: ecgWave, showSymbol: false, lineStyle: { width: 1, color: '#ef4444' } }]
+              });
+            }
+
+            const emgWave = ${JSON.stringify(emgWaveData)};
+            if (emgWave.length) {
+              renderChartToImage('chart-emg-wave', {
+                xAxis: { type: 'category', show: false, data: emgWave.map((_, i) => i) },
+                yAxis: { type: 'value', show: true },
+                grid: { left: 30, right: 10, top: 10, bottom: 20 },
+                series: [{ type: 'line', data: emgWave, showSymbol: false, lineStyle: { width: 1, color: '#3b82f6' } }]
+              });
+            }
+
+          };
+          const waitStart = Date.now();
+          const waitForEcharts = () => {
+            if (window.echarts) {
+              startRender();
+              return;
+            }
+            if (Date.now() - waitStart > 5000) {
+              window.__chartsReady = true;
+              return;
+            }
+            setTimeout(waitForEcharts, 100);
+          };
+          waitForEcharts();
 
         </script>
       </body>
@@ -1009,10 +1539,20 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
 
     // 4. 生成 PDF
     const win = new BrowserWindow({ show: false, width: 800, height: 1200 });
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-    
-    // 等待图表渲染
-    await new Promise(r => setTimeout(r, 1000));
+    const tempHtmlPath = path.join(app.getPath('temp'), `report_${subjectId}_${timestamp}.html`);
+    fs.writeFileSync(tempHtmlPath, htmlContent, 'utf-8');
+    await win.loadFile(tempHtmlPath);
+    await win.webContents.executeJavaScript(`
+      new Promise(resolve => {
+        const start = Date.now();
+        const tick = () => {
+          if (window.__chartsReady) return resolve(true);
+          if (Date.now() - start > 8000) return resolve(false);
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+    `);
 
     const pdfData = await win.webContents.printToPDF({
       printBackground: true,
@@ -1021,6 +1561,9 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     });
 
     win.close();
+    try {
+      fs.unlinkSync(tempHtmlPath);
+    } catch (e) {}
 
     // 5. 保存文件
     const { filePath } = await dialog.showSaveDialog({
@@ -1050,9 +1593,11 @@ ipcMain.handle('ele:predictLevel', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_ele_live.py')], {
+      const pyInfo = getPythonExecInfo();
+      const py = spawn(pyInfo.exe, ['-X', 'utf8', resolveBundledPath('utils/predict_ele_live.py')], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        cwd: getPythonCwd(),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...pyInfo.env }
       });
 
       let stdout = '';
@@ -1074,6 +1619,16 @@ ipcMain.handle('ele:predictLevel', async (_event, subjectId) => {
         try {
           const out = JSON.parse(stdout);
           if (out && out.ok) {
+            try {
+              savePredictionRecord('ele_level', subjectId, {
+                label: out.label,
+                label_text: out.label_text,
+                prob_high: out.prob_high
+              });
+            } catch (e) {
+              resolve({ ok: false, error: '保存预测结果失败: ' + e.message });
+              return;
+            }
             resolve({
               ok: true,
               label: out.label,
@@ -1109,9 +1664,11 @@ ipcMain.handle('cog:predictType', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_cog_type_live.py')], {
+      const pyInfo = getPythonExecInfo();
+      const py = spawn(pyInfo.exe, ['-X', 'utf8', resolveBundledPath('utils/predict_cog_type_live.py')], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        cwd: getPythonCwd(),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...pyInfo.env }
       });
 
       let stdout = '';
@@ -1133,6 +1690,18 @@ ipcMain.handle('cog:predictType', async (_event, subjectId) => {
         try {
           const out = JSON.parse(stdout);
           if (out && out.ok) {
+            try {
+              const labelCode = getCogTypeCode(out.label, out.label_text);
+              savePredictionRecord('cog_type', subjectId, {
+                label: out.label,
+                label_text: out.label_text,
+                label_code: labelCode,
+                probs: out.probs
+              });
+            } catch (e) {
+              resolve({ ok: false, error: '保存预测结果失败: ' + e.message });
+              return;
+            }
             resolve({
               ok: true,
               label: out.label,
@@ -1168,9 +1737,11 @@ ipcMain.handle('mot:predictType', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_motivation_live.py'), 'type'], {
+      const pyInfo = getPythonExecInfo();
+      const py = spawn(pyInfo.exe, ['-X', 'utf8', resolveBundledPath('utils/predict_motivation_live.py'), 'type'], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        cwd: getPythonCwd(),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...pyInfo.env }
       });
 
       let stdout = '';
@@ -1192,6 +1763,16 @@ ipcMain.handle('mot:predictType', async (_event, subjectId) => {
         try {
           const out = JSON.parse(stdout);
           if (out && out.ok) {
+            try {
+              savePredictionRecord('mot_type', subjectId, {
+                label: out.label,
+                label_text: out.label_text,
+                probs: out.probs
+              });
+            } catch (e) {
+              resolve({ ok: false, error: '保存预测结果失败: ' + e.message });
+              return;
+            }
             resolve({
               ok: true,
               label: out.label,
@@ -1227,9 +1808,11 @@ ipcMain.handle('mot:predictLevel', async (_event, subjectId) => {
     }
 
     return await new Promise(resolve => {
-      const py = spawn('python', ['-X', 'utf8', path.join(__dirname, 'predict_motivation_live.py'), 'level'], {
+      const pyInfo = getPythonExecInfo();
+      const py = spawn(pyInfo.exe, ['-X', 'utf8', resolveBundledPath('utils/predict_motivation_live.py'), 'level'], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        cwd: getPythonCwd(),
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', ...pyInfo.env }
       });
 
       let stdout = '';
@@ -1251,6 +1834,17 @@ ipcMain.handle('mot:predictLevel', async (_event, subjectId) => {
         try {
           const out = JSON.parse(stdout);
           if (out && out.ok) {
+            try {
+              savePredictionRecord('mot_level', subjectId, {
+                label: out.label,
+                label_text: out.label_text,
+                prob_high: out.prob_high,
+                score: out.score
+              });
+            } catch (e) {
+              resolve({ ok: false, error: '保存预测结果失败: ' + e.message });
+              return;
+            }
             resolve({
               ok: true,
               label: out.label,
@@ -1284,13 +1878,45 @@ ipcMain.handle('physio:exportSummary', async (_event, payload) => {
     const timestamp = getCNTimestampForFile();
     const module = payload && payload.module ? String(payload.module) : 'unknown';
     const safeSubject = payload && payload.subject_id ? String(payload.subject_id).trim() : 'unknown';
+    const stripEyeHeatmap = (input) => {
+      if (!input || typeof input !== 'object') return input;
+      const cleaned = { ...input };
+      if (cleaned.analysis && typeof cleaned.analysis === 'object') {
+        const analysis = { ...cleaned.analysis };
+        delete analysis.heatmapData;
+        delete analysis.minX;
+        delete analysis.maxX;
+        delete analysis.minY;
+        delete analysis.maxY;
+        if (analysis.isBatch && Array.isArray(analysis.results)) {
+          analysis.results = analysis.results.map(res => {
+            if (!res || typeof res !== 'object') return res;
+            const next = { ...res };
+            delete next.heatmapData;
+            delete next.minX;
+            delete next.maxX;
+            delete next.minY;
+            delete next.maxY;
+            return next;
+          });
+        }
+        cleaned.analysis = analysis;
+      }
+      delete cleaned.heatmapData;
+      delete cleaned.minX;
+      delete cleaned.maxX;
+      delete cleaned.minY;
+      delete cleaned.maxY;
+      return cleaned;
+    };
+    const safePayload = module === 'eye' ? stripEyeHeatmap(payload) : payload;
     const filename = `${module}_${safeSubject || 'unknown'}_${timestamp}.json`;
-    const filePath = path.join(CACHE_DIR, filename);
+    const filePath = path.join(getCacheDir(), filename);
     const record = {
       id: Date.now(),
       module,
       subject_id: safeSubject,
-      ...payload,
+      ...safePayload,
       created_at: getCNISOString()
     };
     fs.writeFileSync(filePath, JSON.stringify(record, null, 2), 'utf-8');
@@ -1307,7 +1933,7 @@ ipcMain.handle('questionnaire:saveAnswers', async (_, payload) => {
     const timestamp = getCNTimestampForFile();
     const subjectId = payload.subject_id || 'unknown';
     const filename = `questionnaire_${subjectId}_${timestamp}.json`;
-    const filePath = path.join(CACHE_DIR, filename);
+    const filePath = path.join(getCacheDir(), filename);
     const record = {
       ...payload,
       created_at: getCNISOString()
@@ -1324,14 +1950,15 @@ ipcMain.handle('questionnaire:saveAnswers', async (_, payload) => {
 
 ipcMain.handle('questionnaire:listAnswers', async (_, limit = 50) => {
   try {
-    if (!fs.existsSync(CACHE_DIR)) {
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) {
       return { ok: true, data: [] };
     }
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('questionnaire_') && f.endsWith('.json'));
+    const files = fs.readdirSync(cacheDir).filter(f => f.startsWith('questionnaire_') && f.endsWith('.json'));
     const records = [];
     for (const file of files) {
       try {
-        const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+        const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
         const record = JSON.parse(content);
         const createdRaw = record.timestamp || record.created_at || getCNISOString();
         records.push({
@@ -1353,10 +1980,11 @@ ipcMain.handle('questionnaire:listAnswers', async (_, limit = 50) => {
 
 ipcMain.handle('questionnaire:getLatest', async (_, subjectId) => {
   try {
-    if (!fs.existsSync(CACHE_DIR)) return { ok: false, error: '暂无数据' };
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) return { ok: false, error: '暂无数据' };
     
     const prefix = `questionnaire_${subjectId}_`;
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith(prefix) && f.endsWith('.json'));
+    const files = fs.readdirSync(cacheDir).filter(f => f.startsWith(prefix) && f.endsWith('.json'));
     
     if (files.length === 0) return { ok: false, error: '未找到该被试的问卷数据' };
     
@@ -1364,7 +1992,7 @@ ipcMain.handle('questionnaire:getLatest', async (_, subjectId) => {
     files.sort().reverse();
     
     const latestFile = files[0];
-    const content = fs.readFileSync(path.join(CACHE_DIR, latestFile), 'utf-8');
+    const content = fs.readFileSync(path.join(cacheDir, latestFile), 'utf-8');
     const data = JSON.parse(content);
     return { ok: true, data };
   } catch (e) {
@@ -1374,7 +2002,7 @@ ipcMain.handle('questionnaire:getLatest', async (_, subjectId) => {
 
 ipcMain.handle('questionnaire:getDefault', async () => {
   try {
-    const filePath = path.join(__dirname, 'questionnaire.json');
+    const filePath = path.join(__dirname, 'data', 'questionnaire.json');
     if (!fs.existsSync(filePath)) {
       return { ok: false, error: '未找到默认问卷配置文件' };
     }
@@ -1391,7 +2019,7 @@ ipcMain.handle('physio:saveRecord', async (_, data) => {
     ensureCacheDir();
     const timestamp = getCNTimestampForFile();
     const filename = `physio_${data.subject_id}_${timestamp}.json`;
-    const filePath = path.join(CACHE_DIR, filename);
+    const filePath = path.join(getCacheDir(), filename);
 
     const record = {
       id: Date.now(),
@@ -1409,15 +2037,16 @@ ipcMain.handle('physio:saveRecord', async (_, data) => {
 
 ipcMain.handle('physio:listRecords', async (_, limit = 50) => {
   try {
-    if (!fs.existsSync(CACHE_DIR)) {
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) {
       return { ok: true, data: [] };
     }
 
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('physio_') && f.endsWith('.json'));
+    const files = fs.readdirSync(cacheDir).filter(f => f.startsWith('physio_') && f.endsWith('.json'));
     const records = [];
     for (const file of files) {
       try {
-        const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+        const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
         const record = JSON.parse(content);
         records.push(record);
       } catch (err) {
@@ -1553,7 +2182,7 @@ ipcMain.handle('cognitive:saveRecord', async (_, data) => {
     ensureCacheDir();
     const timestamp = getCNTimestampForFile();
     const filename = `cognitive_${data.subject_id}_${timestamp}.json`;
-    const filePath = path.join(CACHE_DIR, filename);
+    const filePath = path.join(getCacheDir(), filename);
 
     const record = {
       id: Date.now(),
@@ -1571,15 +2200,16 @@ ipcMain.handle('cognitive:saveRecord', async (_, data) => {
 
 ipcMain.handle('cognitive:listRecords', async (_, limit = 50) => {
   try {
-    if (!fs.existsSync(CACHE_DIR)) {
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) {
       return { ok: true, data: [] };
     }
 
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('cognitive_') && f.endsWith('.json'));
+    const files = fs.readdirSync(cacheDir).filter(f => f.startsWith('cognitive_') && f.endsWith('.json'));
     const records = [];
     for (const file of files) {
       try {
-        const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+        const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
         const record = JSON.parse(content);
         records.push(record);
       } catch (err) {
@@ -1623,33 +2253,29 @@ ipcMain.handle('cognitive:importPdf', async () => {
 });
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
-const DEFAULT_PATHS = {
-  emg: 'C:\\Users\\vrtrain2\\Desktop\\肌电软件-标准\\软件\\EmgServer采集-64位\\Release\\EmgServer.exe',
-  ecg: 'C:\\Users\\vrtrain2\\Desktop\\运动风险评估系统\\Release\\HeartCapture.exe',
-  eye: 'C:\\Users\\vrtrain2\\Desktop\\vrpack3\\CCHO_DEMO.exe',
-  game: 'D:\\soft\\wechat\\app\\Weixin\\Weixin.exe',
-  emgDataPath: 'D:\\ccho_RECORD\\EMG',
-  ecgDataPath: 'D:\\ccho_RECORD\\ECG',
-  eyeDataPath: 'D:\\ccho_RECORD\\eyetrack'
-};
 
 function loadConfig() {
-  let config = { ...DEFAULT_PATHS };
+  let config = { ...getDefaultPaths() };
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const data = fs.readFileSync(CONFIG_PATH, 'utf-8');
       const userConfig = JSON.parse(data);
       
-      // Merge user config but validate paths
+      const executableKeys = ['emg', 'ecg', 'eye', 'game'];
+      const directoryKeys = ['emgDataPath', 'ecgDataPath', 'eyeDataPath', 'gameDataPath', 'cacheDir'];
+
       Object.keys(userConfig).forEach(key => {
-        const isPathKey = ['emg', 'ecg', 'eye', 'game', 'emgDataPath', 'ecgDataPath', 'eyeDataPath'].includes(key);
-        
-        if (isPathKey) {
-          // Only accept user config path if it exists
-          if (userConfig[key] && fs.existsSync(userConfig[key])) {
-            config[key] = userConfig[key];
-          }
-        } else {
+        if (executableKeys.includes(key)) {
+          if (userConfig[key] && fs.existsSync(userConfig[key])) config[key] = userConfig[key];
+          return;
+        }
+
+        if (directoryKeys.includes(key)) {
+          if (userConfig[key]) config[key] = userConfig[key];
+          return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(userConfig, key)) {
           config[key] = userConfig[key];
         }
       });
@@ -1657,6 +2283,7 @@ function loadConfig() {
   } catch (e) {
     console.error('Failed to load config:', e);
   }
+  ensureDataDirs(config);
   return config;
 }
 
@@ -1701,6 +2328,9 @@ ipcMain.handle('config:getPaths', () => {
 ipcMain.handle('config:setPath', (_, module, path) => {
   const config = loadConfig();
   config[module] = path;
+  if (['emgDataPath', 'ecgDataPath', 'eyeDataPath', 'gameDataPath', 'cacheDir'].includes(module)) {
+    ensureDirSafe(path);
+  }
   saveConfig(config);
   return true;
 });
@@ -1877,7 +2507,8 @@ function parseTask4Content(content) {
 // Game Score Analysis Handlers
 ipcMain.handle('game:analyze', async (_, subjectId) => {
   try {
-    const baseRoot = 'D:\\ccho_RECORD\\SCOREresult';
+    const config = loadConfig();
+    const baseRoot = (config && config.gameDataPath) || 'D:\\ccho_RECORD\\SCOREresult';
     const subjectDir = path.join(baseRoot, subjectId);
 
     if (!fs.existsSync(subjectDir)) {
@@ -1975,7 +2606,7 @@ ipcMain.handle('game:save', async (_, data) => {
         ensureCacheDir();
         const timestamp = getCNTimestampForFile();
         const filename = `game_${data.subject_id}_${timestamp}.json`;
-        const filePath = path.join(CACHE_DIR, filename);
+        const filePath = path.join(getCacheDir(), filename);
         
         const record = {
             id: Date.now(),
@@ -1992,13 +2623,14 @@ ipcMain.handle('game:save', async (_, data) => {
 
 ipcMain.handle('game:listHistory', async (_, limit = 50) => {
     try {
-        if (!fs.existsSync(CACHE_DIR)) return { ok: true, data: [] };
+        const cacheDir = getCacheDir();
+        if (!fs.existsSync(cacheDir)) return { ok: true, data: [] };
         
-        const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith('game_') && f.endsWith('.json'));
+        const files = fs.readdirSync(cacheDir).filter(f => f.startsWith('game_') && f.endsWith('.json'));
         const records = [];
         for (const file of files) {
             try {
-                const content = fs.readFileSync(path.join(CACHE_DIR, file), 'utf-8');
+                const content = fs.readFileSync(path.join(cacheDir, file), 'utf-8');
                 records.push(JSON.parse(content));
             } catch(e) {}
         }

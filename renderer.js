@@ -83,6 +83,32 @@ if (modalCloseBtn) {
   };
 }
 
+function showToast(message, type = 'success', duration = 2000) {
+  const toast = document.createElement('div');
+  const isError = type === 'error';
+  toast.innerText = message;
+  toast.style.position = 'fixed';
+  toast.style.top = '20px';
+  toast.style.right = '20px';
+  toast.style.zIndex = '9999';
+  toast.style.padding = '10px 14px';
+  toast.style.borderRadius = '8px';
+  toast.style.fontSize = '13px';
+  toast.style.color = '#ffffff';
+  toast.style.backgroundColor = isError ? '#ef4444' : '#22c55e';
+  toast.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.2)';
+  toast.style.maxWidth = '360px';
+  toast.style.wordBreak = 'break-word';
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.2s ease';
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 200);
+  }, Math.max(0, duration));
+}
+
 // Button Loading State
 async function withLoading(btn, action) {
   if (!btn) return;
@@ -93,10 +119,7 @@ async function withLoading(btn, action) {
   btn.style.cursor = 'not-allowed';
   
   try {
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('操作超时，请重试')), 10000)
-    );
-    await Promise.race([action(), timeoutPromise]);
+    await action();
   } catch (e) {
     console.error('Button action failed:', e);
     showModal('操作发生错误: ' + (e.message || '未知错误'));
@@ -117,6 +140,44 @@ let lastEcgAnalysis = null;
 let lastEcgSubjectId = '';
 let lastEyeAnalysis = null;
 let lastEyeSubjectId = '';
+
+async function autoSavePhysioAnalysis(module, subjectId, analysis) {
+  const payload = {
+    module,
+    subject_id: subjectId || 'unknown',
+    metrics: analysis && analysis.metrics ? analysis.metrics : {},
+    analysis
+  };
+  const res = await window.api.exportPhysioSummary(payload);
+  if (!res || !res.ok) {
+    const msg = res && res.error ? res.error : '未知错误';
+    showToast(`自动保存失败: ${msg}`, 'error', 4000);
+    return false;
+  }
+  showToast('结果已自动保存至cache', 'success', 2000);
+  return true;
+}
+
+async function autoSaveGameScore(subjectId) {
+  const data = { subject_id: subjectId || 'unknown' };
+  const resultIds = [
+    'val_shooting_total', 'val_shooting_accuracy', 'val_shooting_avg',
+    'val_task4_ball', 'val_task4_line', 'val_task4_total', 'val_task4_accuracy',
+    'val_game5_total', 'val_game5_life'
+  ];
+  resultIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) data[id] = el.innerText;
+  });
+  const res = await window.api.saveGameScore(data);
+  if (!res || !res.ok) {
+    const msg = res && res.error ? res.error : '未知错误';
+    showToast(`自动保存失败: ${msg}`, 'error', 4000);
+    return false;
+  }
+  showToast('结果已自动保存至cache', 'success', 2000);
+  return true;
+}
 
 function calcMean(arr) {
   if (!arr || arr.length === 0) return 0;
@@ -200,7 +261,6 @@ function renderSeriesChart(elId, xData, yData, title) {
 function getQuestionnaireItemId(item, index = 0) {
   if (item && item.id) return String(item.id);
   const sectionPrefixMap = {
-    '训练动机': 'TM',
     '五大人格': 'BF',
     '心理弹性': 'RS',
     '成就动机': 'AM'
@@ -267,25 +327,25 @@ function computeQuestionnaireScores(cfg, answers) {
     const nm = c.name || c.id;
     namedComposites[nm] = compositeScores[c.id] || 0;
   });
+  const pickMetric = (source, key) => (
+    Object.prototype.hasOwnProperty.call(source, key) ? source[key] : null
+  );
+  const pickNamed = (subKey, compKey) => {
+    if (compKey && Object.prototype.hasOwnProperty.call(namedComposites, compKey)) return namedComposites[compKey];
+    if (subKey && Object.prototype.hasOwnProperty.call(namedSubscales, subKey)) return namedSubscales[subKey];
+    return null;
+  };
   const psyResults = {
-    神经质_Psy: namedSubscales['神经质'] || null,
-    尽责性_Psy: namedSubscales['尽责性'] || null,
-    宜人性_Psy: namedSubscales['宜人性'] || null,
-    开放性_Psy: namedSubscales['开放性'] || null,
-    外向性_Psy: namedSubscales['外向性'] || null,
-    内部动机_Psy: namedSubscales['内部动机'] || null,
-    外部调节_Psy: namedSubscales['外在调节'] || null,
-    自主动机_Psy: namedComposites['自主动机'] || null,
-    心理弹性总分_Psy: namedComposites['心理弹性总分'] || namedSubscales['心理弹性总分'] || null,
-    坚韧_Psy: namedSubscales['坚韧'] || null,
-    力量_Psy: namedSubscales['力量'] || null,
-    乐观_Psy: namedSubscales['乐观'] || null,
-    进取_Psy: namedSubscales['进取'] || null,
-    主动_Psy: namedSubscales['主动'] || null,
-    求精_Psy: namedSubscales['求精'] || null,
-    奉献_Psy: namedSubscales['奉献'] || null,
-    乐业_Psy: namedSubscales['乐业'] || null,
-    持续学习_Psy: namedSubscales['持续学习'] || null
+    神经质_Psy: pickMetric(namedSubscales, '神经质'),
+    尽责性_Psy: pickMetric(namedSubscales, '尽责性'),
+    宜人性_Psy: pickMetric(namedSubscales, '宜人性'),
+    开放性_Psy: pickMetric(namedSubscales, '开放性'),
+    外向性_Psy: pickMetric(namedSubscales, '外向性'),
+    坚韧_Psy: pickMetric(namedSubscales, '坚韧'),
+    力量_Psy: pickMetric(namedSubscales, '力量'),
+    乐观_Psy: pickMetric(namedSubscales, '乐观'),
+    心理弹性总分_Psy: pickNamed('心理弹性总分', '心理弹性总分'),
+    成就动机_Psy: pickMetric(namedSubscales, '成就动机总分')
   };
   return {
     items: itemScores,
@@ -294,6 +354,22 @@ function computeQuestionnaireScores(cfg, answers) {
     subscales_named: namedSubscales,
     composites_named: namedComposites,
     psy_results: psyResults
+  };
+}
+
+function buildQuestionnaireMetrics(scores) {
+  const subNamed = (scores && scores.subscales_named) || {};
+  return {
+    神经质: subNamed['神经质'] ?? null,
+    尽责性: subNamed['尽责性'] ?? null,
+    宜人性: subNamed['宜人性'] ?? null,
+    开放性: subNamed['开放性'] ?? null,
+    外向性: subNamed['外向性'] ?? null,
+    坚韧: subNamed['坚韧'] ?? null,
+    力量: subNamed['力量'] ?? null,
+    乐观: subNamed['乐观'] ?? null,
+    心理弹性总分: subNamed['心理弹性总分'] ?? null,
+    成就动机: subNamed['成就动机总分'] ?? null
   };
 }
 
@@ -307,24 +383,21 @@ async function renderQuestionnaireFields() {
   defaultQuestionnaireCfg = cfg;
   
   const titleEl = document.querySelector('#questionnaire-form h3');
-  if (titleEl) titleEl.innerText = cfg.title || '技能训练动机问卷';
+  if (titleEl) titleEl.innerText = cfg.title || '技能训练问卷';
   
   container.innerHTML = '';
   const sectionMeta = {
-    '训练动机': {
-      title: '第一部分：训练动机'
-    },
     '五大人格': {
-      title: '第二部分：大五人格'
+      title: '第一部分：大五人格'
     },
     '心理弹性': {
-      title: '第三部分：心理弹性'
+      title: '第二部分：心理弹性'
     },
     '成就动机': {
-      title: '第四部分：成就动机'
+      title: '第三部分：成就动机'
     }
   };
-  const sectionOrder = ['训练动机', '五大人格', '心理弹性', '成就动机'];
+  const sectionOrder = ['五大人格', '心理弹性', '成就动机'];
   const grouped = new Map();
   (Array.isArray(cfg.items) ? cfg.items : []).forEach((item, index) => {
     const sectionName = item && item.section ? item.section : '其他';
@@ -364,7 +437,7 @@ async function renderQuestionnaireFields() {
       const group = document.createElement('div');
       group.style.marginBottom = '14px';
       const qText = document.createElement('div');
-      qText.style.fontSize = '14px';
+      qText.style.fontSize = '16px';
       qText.style.marginBottom = '8px';
       qText.style.color = '#111827';
       qText.innerText = `${displayNo}. ${item.text || `${sectionName} 第${displayNo}题`}`;
@@ -389,7 +462,7 @@ async function renderQuestionnaireFields() {
         radio.value = String(v);
         radio.id = `q_item_${itemId}_${v}`;
         const txt = document.createElement('span');
-        txt.style.fontSize = '14px';
+        txt.style.fontSize = '15px';
         txt.style.color = '#555';
         txt.innerText = labels[String(v)] || String(v);
         optWrap.appendChild(radio);
@@ -954,13 +1027,6 @@ const questionnaireTheoreticalRanges = {
   力量: { min: 8, max: 40 },
   乐观: { min: 4, max: 20 },
   心理弹性总分: { min: 25, max: 125 },
-  内部动机: { min: 4, max: 20 },
-  整合调节: { min: 4, max: 20 },
-  内摄调节: { min: 4, max: 20 },
-  外在调节: { min: 4, max: 20 },
-  无动机: { min: 4, max: 20 },
-  认同动机: { min: 3, max: 15 },
-  自主动机: { min: -81, max: 91 },
   成就动机总分: { min: 21, max: 105 }
 };
 
@@ -1020,11 +1086,6 @@ function renderQuestionnaireTable(containerId, scores, questionnaireCfg) {
   const composites = scores.composites_named || {};
   const metricDefs = [
     {
-      label: '自主动机',
-      value: Number(composites['自主动机'] || 0),
-      range: getQuestionnaireCompositeRange(questionnaireCfg, 'autonomous_motivation')
-    },
-    {
       label: '心理弹性总分',
       value: Number(subscales['心理弹性总分'] || composites['心理弹性总分'] || 0),
       range: getQuestionnaireSubscaleRange(questionnaireCfg, 'resilience_total')
@@ -1071,19 +1132,6 @@ function renderQuestionnaireTable(containerId, scores, questionnaireCfg) {
 function renderQuestionnaireRadar(scores, questionnaireCfg) {
     const subscales = scores.subscales_named || {};
     const radarDefs = [
-      {
-        chartId: 'questionnaire-radar-training',
-        title: '训练动机',
-        color: '#2563eb',
-        dimensions: [
-          { name: '内部动机', subscaleId: 'intrinsic_motivation' },
-          { name: '整合调节', subscaleId: 'integrated_regulation' },
-          { name: '内摄调节', subscaleId: 'introjected_regulation' },
-          { name: '外在调节', subscaleId: 'external_regulation' },
-          { name: '无动机', subscaleId: 'amotivation' },
-          { name: '认同动机', subscaleId: 'identified_motivation' }
-        ]
-      },
       {
         chartId: 'questionnaire-radar-bigfive',
         title: '大五人格',
@@ -1173,27 +1221,9 @@ if (analyzeEmgBtn) {
       if (!res.ok) throw new Error(res.error);
       
       renderEmgResult(res.data, subjectId);
+      await autoSavePhysioAnalysis('emg', subjectId, res.data);
       showModal('分析完成 (Analysis Complete)');
     });
-  };
-}
-
-const exportEmgBtn = document.getElementById('exportEmgBtn');
-if (exportEmgBtn) {
-  exportEmgBtn.onclick = async () => {
-    if (!lastEmgAnalysis || !lastEmgAnalysis.metrics) {
-      return showModal('请先完成分析 (Please complete analysis first)');
-    }
-    const m = lastEmgAnalysis.metrics;
-    const res = await window.api.exportPhysioSummary({
-      module: 'emg',
-      subject_id: lastEmgSubjectId || 'unknown',
-      metrics: m
-    });
-    if (!res || !res.ok) {
-      return showModal('保存失败 (Save Failed): ' + (res && res.error ? res.error : '未知错误'));
-    }
-    showModal('结果已保存 (Results Saved)');
   };
 }
 
@@ -1219,27 +1249,9 @@ if (analyzeEcgBtn) {
       if (!res.ok) throw new Error(res.error);
       
       renderEcgResult(res.data, subjectId);
+      await autoSavePhysioAnalysis('ecg', subjectId, res.data);
       showModal('分析完成 (Analysis Complete)');
     });
-  };
-}
-
-const exportEcgBtn = document.getElementById('exportEcgBtn');
-if (exportEcgBtn) {
-  exportEcgBtn.onclick = async () => {
-    if (!lastEcgAnalysis || !lastEcgAnalysis.metrics) {
-      return showModal('请先完成分析 (Please complete analysis first)');
-    }
-    const m = lastEcgAnalysis.metrics;
-    const res = await window.api.exportPhysioSummary({
-      module: 'ecg',
-      subject_id: lastEcgSubjectId || 'unknown',
-      metrics: m
-    });
-    if (!res || !res.ok) {
-      return showModal('保存失败 (Save Failed): ' + (res && res.error ? res.error : '未知错误'));
-    }
-    showModal('结果已保存 (Results Saved)');
   };
 }
 
@@ -1265,27 +1277,9 @@ if (analyzeEyeBtn) {
       if (!res.ok) throw new Error(res.error);
       
       renderEyeResult(res.data, subjectId);
+      await autoSavePhysioAnalysis('eye', subjectId, res.data);
       showModal('分析完成 (Analysis Complete)');
     });
-  };
-}
-
-const exportEyeBtn = document.getElementById('exportEyeBtn');
-if (exportEyeBtn) {
-  exportEyeBtn.onclick = async () => {
-    if (!lastEyeAnalysis || !lastEyeAnalysis.metrics) {
-      return showModal('请先完成分析 (Please complete analysis first)');
-    }
-    const m = lastEyeAnalysis.metrics;
-    const res = await window.api.exportPhysioSummary({
-      module: 'eye',
-      subject_id: lastEyeSubjectId || 'unknown',
-      metrics: m
-    });
-    if (!res || !res.ok) {
-      return showModal('保存失败 (Save Failed): ' + (res && res.error ? res.error : '未知错误'));
-    }
-    showModal('结果已保存 (Results Saved)');
   };
 }
 
@@ -1357,7 +1351,7 @@ if (saveQuestionnaireBtn) {
             data[`q_item_${itemId}`] = checked ? parseInt(checked.value, 10) : null;
           });
           data.questionnaire_id = defaultQuestionnaireCfg.questionnaire_id || 'default';
-          data.title = defaultQuestionnaireCfg.title || '技能训练动机问卷';
+          data.title = defaultQuestionnaireCfg.title || '技能训练问卷';
         }
         data.subject_id = data.basic_subject_id || data.subject_id || '';
         const err = document.getElementById('questionnaire-error');
@@ -1374,6 +1368,7 @@ if (saveQuestionnaireBtn) {
           if (defaultQuestionnaireCfg) {
             const scores = computeQuestionnaireScores(defaultQuestionnaireCfg, data);
             data.scores = scores;
+            data.questionnaire_metrics = buildQuestionnaireMetrics(scores);
           }
           await window.api.saveQuestionnaireAnswers(data);
           // Removed result display as per request
@@ -1533,6 +1528,8 @@ async function handleGameImport(btnId, type) {
                         if (el) el.innerText = res.data[key];
                     }
                 });
+                const subjectId = getGlobalSubjectId();
+                await autoSaveGameScore(subjectId);
                 showModal('导入成功 (Import Successful)');
             } else {
                 showModal('分析失败 (Analysis Failed): ' + (res.error || '未知错误'));
@@ -1564,37 +1561,11 @@ if (analyzeGameBtn) {
                         if (el && res.data.hasOwnProperty(src)) el.innerText = res.data[src];
                     });
                 }
+                await autoSaveGameScore(subjectId);
                 showModal('分析完成 (Analysis Complete)');
             } else {
                 showModal('分析失败 (Analysis Failed): ' + (res.error || '未找到数据'));
             }
-        });
-    };
-}
-
-const saveGameBtn = document.getElementById('saveGameBtn');
-if (saveGameBtn) {
-    saveGameBtn.onclick = async () => {
-        const subjectId = getGlobalSubjectId();
-        if (!subjectId) return showModal('请先在问卷中填写 Subject ID');
-        
-        // Collect current displayed data
-        const data = { subject_id: subjectId };
-        const resultIds = [
-            'val_shooting_total', 'val_shooting_accuracy', 'val_shooting_avg',
-            'val_task4_ball', 'val_task4_line', 'val_task4_total', 'val_task4_accuracy',
-            'val_game5_total', 'val_game5_life'
-        ];
-        
-        resultIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) data[id] = el.innerText;
-        });
-
-        await withLoading(saveGameBtn, async () => {
-            const res = await window.api.saveGameScore(data);
-            if (res.ok) showModal('游戏成绩保存成功');
-            else showModal('保存失败: ' + res.error);
         });
     };
 }
@@ -1631,12 +1602,18 @@ async function loadSettings() {
                 'ecgPathInput': paths.ecg,
                 'ecgDataPathInput': paths.ecgDataPath,
                 'eyePathInput': paths.eye,
-                'eyeDataPathInput': paths.eyeDataPath
+                'eyeDataPathInput': paths.eyeDataPath,
+                'gameDataPathInput': paths.gameDataPath,
+                'cacheDirInput': paths.cacheDir
             };
             Object.entries(map).forEach(([id, val]) => {
                 const el = document.getElementById(id);
                 if (el && val) el.value = val;
             });
+            const autoMaximizeCheckbox = document.getElementById('autoMaximizeCheckbox');
+            if (autoMaximizeCheckbox) {
+                autoMaximizeCheckbox.checked = Boolean(paths.autoMaximize);
+            }
         }
     } catch (e) {
         console.error('Failed to load settings:', e);
@@ -1652,7 +1629,9 @@ const configBindings = [
     { btn: 'browseEcgPathBtn', input: 'ecgPathInput', key: 'ecg', type: 'file' },
     { btn: 'browseEcgDataPathBtn', input: 'ecgDataPathInput', key: 'ecgDataPath', type: 'folder' },
     { btn: 'browseEyePathBtn', input: 'eyePathInput', key: 'eye', type: 'file' },
-    { btn: 'browseEyeDataPathBtn', input: 'eyeDataPathInput', key: 'eyeDataPath', type: 'folder' }
+    { btn: 'browseEyeDataPathBtn', input: 'eyeDataPathInput', key: 'eyeDataPath', type: 'folder' },
+    { btn: 'browseGameDataPathBtn', input: 'gameDataPathInput', key: 'gameDataPath', type: 'folder' },
+    { btn: 'browseCacheDirBtn', input: 'cacheDirInput', key: 'cacheDir', type: 'folder' }
 ];
 
 configBindings.forEach(cfg => {
@@ -1670,14 +1649,19 @@ configBindings.forEach(cfg => {
     }
 });
 
+const autoMaximizeCheckbox = document.getElementById('autoMaximizeCheckbox');
+if (autoMaximizeCheckbox) {
+    autoMaximizeCheckbox.onchange = async () => {
+        await window.api.setPath('autoMaximize', autoMaximizeCheckbox.checked);
+    };
+}
+
 const runPredictionBtn = document.getElementById('run-prediction-btn');
 if (runPredictionBtn) {
     runPredictionBtn.onclick = async () => {
-        const idInput = document.getElementById('prediction-subject-id');
-        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
-        const subjectId = manualId || getGlobalSubjectId();
+        const subjectId = getGlobalSubjectId();
         if (!subjectId) {
-            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+            return showModal('请先在问卷中填写被试编号');
         }
 
         const resultBox = document.getElementById('prediction-result');
@@ -1704,7 +1688,7 @@ if (runPredictionBtn) {
                 tag: '体能等级 (ELE)',
                 guidanceKey: 'ele',
                 color: '#0ea5e9',
-                description: `模型预测结果为：<strong>${res.label_text}</strong>。<br>综合分析了问卷、生理及体能测试数据。`
+                description: `预测结果为：<strong>${res.label_text}</strong>。<br>综合了问卷、生理与任务表现的数据。`
             });
         });
     };
@@ -1713,11 +1697,9 @@ if (runPredictionBtn) {
 const runCogPredictionBtn = document.getElementById('run-cog-prediction-btn');
 if (runCogPredictionBtn) {
     runCogPredictionBtn.onclick = async () => {
-        const idInput = document.getElementById('cog-prediction-subject-id');
-        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
-        const subjectId = manualId || getGlobalSubjectId();
+        const subjectId = getGlobalSubjectId();
         if (!subjectId) {
-            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+            return showModal('请先在问卷中填写被试编号');
         }
 
         const resultBox = document.getElementById('cog-prediction-result');
@@ -1739,7 +1721,7 @@ if (runCogPredictionBtn) {
                 tag: '认知类型 (COG)',
                 guidanceKey: 'cog',
                 color: '#8b5cf6',
-                description: `模型预测优势类型为：<strong>${res.label_text || res.label}</strong>。<br>基于多项认知任务指标的综合评估。`
+                description: `预测优势类型为：<strong>${res.label_text || res.label}</strong>。<br>基于多项认知任务表现的综合评估。`
             });
         });
     };
@@ -1748,11 +1730,9 @@ if (runCogPredictionBtn) {
 const runMotTypeBtn = document.getElementById('run-mot-type-btn');
 if (runMotTypeBtn) {
     runMotTypeBtn.onclick = async () => {
-        const idInput = document.getElementById('mot-prediction-subject-id');
-        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
-        const subjectId = manualId || getGlobalSubjectId();
+        const subjectId = getGlobalSubjectId();
         if (!subjectId) {
-            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+            return showModal('请先在问卷中填写被试编号');
         }
 
         const resultBox = document.getElementById('mot-type-result');
@@ -1774,7 +1754,7 @@ if (runMotTypeBtn) {
                 tag: '动机类型 (MOT TYPE)',
                 guidanceKey: 'mot_type',
                 color: '#f59e0b',
-                description: `模型预测主导动机为：<strong>${res.label_text || res.label}</strong>。<br>基于多维心理问卷数据的分类结果。`
+                description: `预测主导动机为：<strong>${res.label_text || res.label}</strong>。<br>基于问卷与行为数据的综合判断。`
             });
         });
     };
@@ -1783,11 +1763,9 @@ if (runMotTypeBtn) {
 const runMotLevelBtn = document.getElementById('run-mot-level-btn');
 if (runMotLevelBtn) {
     runMotLevelBtn.onclick = async () => {
-        const idInput = document.getElementById('mot-prediction-subject-id');
-        const manualId = idInput && idInput.value ? idInput.value.trim() : '';
-        const subjectId = manualId || getGlobalSubjectId();
+        const subjectId = getGlobalSubjectId();
         if (!subjectId) {
-            return showModal('请先填写被试编号（可以在问卷页或本页填写）');
+            return showModal('请先在问卷中填写被试编号');
         }
 
         const resultBox = document.getElementById('mot-level-result');
@@ -1812,7 +1790,7 @@ if (runMotLevelBtn) {
                 tag: '动机水平 (MOT LEVEL)',
                 guidanceKey: 'mot_level',
                 color: '#10b981',
-                description: `预测等级：<strong>${res.label_text}</strong>。<br>回归预测得分为 ${res.score.toFixed(2)}。`
+                description: `预测等级：<strong>${res.label_text}</strong>。<br>综合评估得分为 ${res.score.toFixed(2)}。`
             });
         });
     };
