@@ -20,7 +20,6 @@ function getDefaultPaths() {
     emg: 'C:\\Users\\vrtrain2\\Desktop\\肌电软件-标准\\软件\\EmgServer采集-64位\\Release\\EmgServer.exe',
     ecg: 'C:\\Users\\vrtrain2\\Desktop\\运动风险评估系统\\Release\\HeartCapture.exe',
     eye: 'C:\\Users\\vrtrain2\\Desktop\\vrpack3\\CCHO_DEMO.exe',
-    game: 'D:\\soft\\wechat\\app\\Weixin\\Weixin.exe',
     emgDataPath: path.join(dataRoot, 'EMG'),
     ecgDataPath: path.join(dataRoot, 'ECG'),
     eyeDataPath: path.join(dataRoot, 'eyetrack'),
@@ -2261,7 +2260,7 @@ function loadConfig() {
       const data = fs.readFileSync(CONFIG_PATH, 'utf-8');
       const userConfig = JSON.parse(data);
       
-      const executableKeys = ['emg', 'ecg', 'eye', 'game'];
+      const executableKeys = ['emg', 'ecg', 'eye'];
       const directoryKeys = ['emgDataPath', 'ecgDataPath', 'eyeDataPath', 'gameDataPath', 'cacheDir'];
 
       Object.keys(userConfig).forEach(key => {
