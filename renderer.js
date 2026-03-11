@@ -857,25 +857,45 @@ function renderEmgResult(d, subjectId) {
     grid.innerHTML = '';
     const m = d.metrics || {};
     const rows = [
-      ['手臂 MAV (Arm_MAV)', m.Arm_MAV],
-      ['手臂 MDF (Hz, Arm_MDF)', m.Arm_MDF],
-      ['手臂 MPF (Hz, Arm_MPF)', m.Arm_MPF],
-      ['手臂 RMS (Arm_RMS)', m.Arm_RMS],
-      ['手臂 iEMG (Arm_iEMG)', m.Arm_iEMG],
-      ['手臂最大幅值 Max_Amp (Arm_Max_Amp)', m.Arm_Max_Amp],
-      ['颈部 MAV (Neck_MAV)', m.Neck_MAV],
-      ['颈部 MDF (Hz, Neck_MDF)', m.Neck_MDF],
-      ['颈部 MPF (Hz, Neck_MPF)', m.Neck_MPF],
-      ['颈部 RMS (Neck_RMS)', m.Neck_RMS],
-      ['颈部 iEMG (Neck_iEMG)', m.Neck_iEMG],
-      ['颈部最大幅值 Max_Amp (Neck_Max_Amp)', m.Neck_Max_Amp]
+      ['上肢肌电平均绝对值', m.Arm_MAV],
+      ['上肢肌电中值频率 (Hz)', m.Arm_MDF],
+      ['上肢肌电平均功率频率 (Hz)', m.Arm_MPF],
+      ['上肢肌电均方根', m.Arm_RMS],
+      ['上肢肌电积分', m.Arm_iEMG],
+      ['上肢肌电最大幅值', m.Arm_Max_Amp],
+      ['颈部肌电平均绝对值', m.Neck_MAV],
+      ['颈部肌电中值频率 (Hz)', m.Neck_MDF],
+      ['颈部肌电平均功率频率 (Hz)', m.Neck_MPF],
+      ['颈部肌电均方根', m.Neck_RMS],
+      ['颈部肌电积分', m.Neck_iEMG],
+      ['颈部肌电最大幅值', m.Neck_Max_Amp]
     ];
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
-      div.style.padding = '4px 0';
-      div.style.fontSize = '13px';
+      div.className = 'metric-card';
+      div.style.background = '#f8fafc';
+      div.style.border = '1px solid #e2e8f0';
+      div.style.borderRadius = '6px';
+      div.style.padding = '8px 12px';
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.style.justifyContent = 'center';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.style.fontSize = '12px';
+      labelSpan.style.color = '#64748b';
+      labelSpan.style.marginBottom = '4px';
+      labelSpan.innerText = label;
+
+      const valueSpan = document.createElement('span');
+      valueSpan.style.fontSize = '18px';
+      valueSpan.style.fontWeight = 'bold';
+      valueSpan.style.color = '#0f172a';
       const v = typeof value === 'number' ? value.toFixed(2) : (value != null ? String(value) : '-');
-      div.innerText = `${label}: ${v}`;
+      valueSpan.innerText = v;
+
+      div.appendChild(labelSpan);
+      div.appendChild(valueSpan);
       grid.appendChild(div);
     });
   }
@@ -894,24 +914,44 @@ function renderEcgResult(d, subjectId) {
     grid.innerHTML = '';
     const m = d.metrics || {};
     const rows = [
-      ['R 峰数量 n_peaks_ECG', m.n_peaks_ECG],
-      ['平均 R-R 间期 Mean_RR_ms_ECG (ms)', m.Mean_RR_ms_ECG],
-      ['R-R 标准差 SDNN_ms_ECG (ms)', m.SDNN_ms_ECG],
-      ['RMSSD_ms_ECG (ms)', m.RMSSD_ms_ECG],
-      ['pNN50_pct_ECG (%)', m.pNN50_pct_ECG],
-      ['平均心率 HR_Mean_ECG (bpm)', m.HR_Mean_ECG],
-      ['心率标准差 HR_Std_ECG (bpm)', m.HR_Std_ECG],
-      ['心率变异率 HR_Change_Rate_ECG (%)', m.HR_Change_Rate_ECG],
-      ['平均呼吸率 Resp_Mean_ECG (rpm)', m.Resp_Mean_ECG],
-      ['呼吸率标准差 Resp_Std_ECG (rpm)', m.Resp_Std_ECG],
-      ['呼吸率变化率 Resp_Change_Rate_ECG (%)', m.Resp_Change_Rate_ECG]
+      ['心电 R 峰数量 (次)', m.n_peaks_ECG],
+      ['平均 RR 间期 (ms)', m.Mean_RR_ms_ECG],
+      ['RR 间期标准差 (ms)', m.SDNN_ms_ECG],
+      ['相邻 RR 差值均方根 (ms)', m.RMSSD_ms_ECG],
+      ['相邻 RR 间期差值 >50ms 比例 (%)', m.pNN50_pct_ECG],
+      ['平均心率 (bpm)', m.HR_Mean_ECG],
+      ['心率标准差 (bpm)', m.HR_Std_ECG],
+      ['心率变化率 (%)', m.HR_Change_Rate_ECG],
+      ['平均呼吸率 (次/分钟)', m.Resp_Mean_ECG],
+      ['呼吸率标准差 (次/分钟)', m.Resp_Std_ECG],
+      ['呼吸率变化率 (%)', m.Resp_Change_Rate_ECG]
     ];
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
-      div.style.padding = '4px 0';
-      div.style.fontSize = '13px';
+      div.className = 'metric-card';
+      div.style.background = '#f8fafc';
+      div.style.border = '1px solid #e2e8f0';
+      div.style.borderRadius = '6px';
+      div.style.padding = '8px 12px';
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.style.justifyContent = 'center';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.style.fontSize = '12px';
+      labelSpan.style.color = '#64748b';
+      labelSpan.style.marginBottom = '4px';
+      labelSpan.innerText = label;
+
+      const valueSpan = document.createElement('span');
+      valueSpan.style.fontSize = '18px';
+      valueSpan.style.fontWeight = 'bold';
+      valueSpan.style.color = '#0f172a';
       const v = typeof value === 'number' ? value.toFixed(2) : (value != null ? String(value) : '-');
-      div.innerText = `${label}: ${v}`;
+      valueSpan.innerText = v;
+
+      div.appendChild(labelSpan);
+      div.appendChild(valueSpan);
       grid.appendChild(div);
     });
   }
@@ -944,24 +984,47 @@ function renderEyeResult(d, subjectId) {
     */
 
     const rows = [
-      ['眨眼次数 Blink Count', m.blink_count_Eye],
-      ['眨眼频率 Blink Rate (Hz)', m.blink_rate_Hz_Eye],
-      ['眨眼持续时间 Blink Dur (ms)', m.blink_dur_ms_Eye],
-      ['注视次数 Fixation Count', m.fixation_count_Eye],
-      ['注视频率 Fixation Rate (Hz)', m.fixation_rate_Hz_Eye],
-      ['平均注视时长 Avg Fix Dur (ms)', m.avg_fixation_dur_ms_Eye],
-      ['平均瞳孔直径 Pupil Diam (mm)', m.avg_pupil_diam_mm_Eye],
-      ['扫视次数 Saccade Count', m.saccade_count_Eye],
-      ['扫视频率 Saccade Rate (Hz)', m.saccade_rate_Hz_Eye],
-      ['平均扫视幅度 Avg Sacc Amp (deg)', m.avg_saccade_amp_deg_Eye],
-      ['平均扫视速度 Avg Sacc Vel (deg/s)', m.avg_saccade_vel_deg_s_Eye]
+      ['由于增加了上面的三个指标', null], // Placeholder or wait, I don't need this right? Let me check the prompt: "数据分析模块中ecg，emg和眼动数据分析中，软件中展示的指标名称直接采用Neck_Max_Amp这种变量名，现将其全部改成中文名(单位)的形式，并优化指标的展示表格，使其紧凑且美观。"
+      ['眨眼次数 (次)', m.blink_count_Eye],
+      ['眨眼频率 (Hz)', m.blink_rate_Hz_Eye],
+      ['眨眼持续时间 (ms)', m.blink_dur_ms_Eye],
+      ['注视次数 (次)', m.fixation_count_Eye],
+      ['注视频率 (Hz)', m.fixation_rate_Hz_Eye],
+      ['平均注视时长 (ms)', m.avg_fixation_dur_ms_Eye],
+      ['平均瞳孔直径 (mm)', m.avg_pupil_diam_mm_Eye],
+      ['扫视次数 (次)', m.saccade_count_Eye],
+      ['扫视频率 (Hz)', m.saccade_rate_Hz_Eye],
+      ['平均扫视幅度 (度)', m.avg_saccade_amp_deg_Eye],
+      ['平均扫视速度 (度/秒)', m.avg_saccade_vel_deg_s_Eye]
     ];
+    // Remove the null placeholder before mapping
+    rows.shift();
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
-      div.style.padding = '4px 0';
-      div.style.fontSize = '13px';
+      div.className = 'metric-card';
+      div.style.background = '#f8fafc';
+      div.style.border = '1px solid #e2e8f0';
+      div.style.borderRadius = '6px';
+      div.style.padding = '8px 12px';
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.style.justifyContent = 'center';
+
+      const labelSpan = document.createElement('span');
+      labelSpan.style.fontSize = '12px';
+      labelSpan.style.color = '#64748b';
+      labelSpan.style.marginBottom = '4px';
+      labelSpan.innerText = label;
+
+      const valueSpan = document.createElement('span');
+      valueSpan.style.fontSize = '18px';
+      valueSpan.style.fontWeight = 'bold';
+      valueSpan.style.color = '#0f172a';
       const v = typeof value === 'number' ? value.toFixed(2) : (value != null ? String(value) : '-');
-      div.innerText = `${label}: ${v}`;
+      valueSpan.innerText = v;
+
+      div.appendChild(labelSpan);
+      div.appendChild(valueSpan);
       grid.appendChild(div);
     });
   }
