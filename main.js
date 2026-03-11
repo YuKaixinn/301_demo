@@ -1164,10 +1164,50 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     const emgRecord = getLatestCacheRecord('emg');
     const eyeRecord = getLatestCacheRecord('eye');
 
+    const metricNameMap = {
+        'n_peaks_ECG': '心电 R 峰数量 (次)',
+        'Mean_RR_ms_ECG': '平均 RR 间期 (ms)',
+        'SDNN_ms_ECG': 'RR 间期标准差 (ms)',
+        'RMSSD_ms_ECG': '相邻 RR 差值均方根 (ms)',
+        'pNN50_pct_ECG': '相邻 RR 间期差值 >50ms 比例 (%)',
+        'HR_Mean_ECG': '平均心率 (bpm)',
+        'HR_Std_ECG': '心率标准差 (bpm)',
+        'HR_Change_Rate_ECG': '心率变化率 (%)',
+        'Resp_Mean_ECG': '平均呼吸率 (次/分钟)',
+        'Resp_Std_ECG': '呼吸率标准差',
+        'Resp_Change_Rate_ECG': '呼吸率变化率 (%)',
+        
+        'Arm_MAV': '上肢肌电平均绝对值',
+        'Arm_MDF': '上肢肌电中值频率 (Hz)',
+        'Arm_MPF': '上肢肌电平均功率频率 (Hz)',
+        'Arm_RMS': '上肢肌电均方根',
+        'Arm_iEMG': '上肢肌电积分',
+        'Arm_Max_Amp': '上肢肌电最大幅值',
+        'Neck_MAV': '颈部肌电平均绝对值',
+        'Neck_MDF': '颈部肌电中值频率 (Hz)',
+        'Neck_MPF': '颈部肌电平均功率频率 (Hz)',
+        'Neck_RMS': '颈部肌电均方根',
+        'Neck_iEMG': '颈部肌电积分',
+        'Neck_Max_Amp': '颈部肌电最大幅值',
+
+        'blink_count_Eye': '眨眼次数 (次)',
+        'blink_rate_Hz_Eye': '眨眼频率 (Hz)',
+        'blink_dur_ms_Eye': '眨眼持续时间 (ms)',
+        'fixation_count_Eye': '注视次数 (次)',
+        'fixation_rate_Hz_Eye': '注视频率 (Hz)',
+        'avg_fixation_dur_ms_Eye': '平均注视时长 (ms)',
+        'avg_pupil_diam_mm_Eye': '平均瞳孔直径 (mm)',
+        'saccade_count_Eye': '扫视次数 (次)',
+        'saccade_rate_Hz_Eye': '扫视频率 (Hz)',
+        'avg_saccade_amp_deg_Eye': '平均扫视幅度 (度)',
+        'avg_saccade_vel_deg_s_Eye': '平均扫视速度 (度/秒)'
+    };
+
     const renderMetricTable = (title, metricsObj) => {
         const rows = metricsObj ? Object.entries(metricsObj).map(([key, value]) => {
             const valStr = formatValue(value);
-            return `<tr><td>${key}</td><td>${valStr}</td></tr>`;
+            const displayKey = metricNameMap[key] || key;
+            return `<tr><td>${displayKey}</td><td>${valStr}</td></tr>`;
         }).join('') : '';
 
         return `
