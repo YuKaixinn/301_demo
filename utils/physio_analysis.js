@@ -125,6 +125,115 @@ function detectRPeaks(signal, sampleRate) {
   return peaks;
 }
 
+/**
+ * Estimates respiration-related metrics from RR tachogram spectrum.
+ * Respiration band is constrained to 0.1-0.5 Hz.
+ */
+function estimateRespMetricsFromRR(rrMs) {
+  if (!rrMs || rrMs.length < 4) {
+    return { mean: 0, std: 0, changeRate: 0 };
+  }
+
+  const n = rrMs.length;
+  const rrSec = new Float64Array(n);
+  let rrSecSum = 0;
+  for (let i = 0; i < n; i++) {
+    const v = rrMs[i] / 1000;
+    rrSec[i] = v;
+    rrSecSum += v;
+  }
+  const meanRRsec = rrSecSum / n;
+  if (!(meanRRsec > 0)) {
+    return { mean: 0, std: 0, changeRate: 0 };
+  }
+
+  // RR tachogram is sampled once per beat.
+  const fs = 1 / meanRRsec;
+  const nyquist = fs / 2;
+  const fMin = 0.1;
+  const fMax = Math.min(0.5, nyquist);
+  if (!(fMax > fMin)) {
+    return { mean: 0, std: 0, changeRate: 0 };
+  }
+
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += rrSec[i];
+  mean /= n;
+
+  const x = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    x[i] = rrSec[i] - mean;
+  }
+
+  const maxK = Math.floor(n / 2);
+  let bandPower = 0;
+  let weightedFreqSum = 0;
+  let peakPower = 0;
+  let peakFreq = 0;
+
+  for (let k = 1; k <= maxK; k++) {
+    const f = (k * fs) / n;
+    if (f < fMin || f > fMax) continue;
+
+    let re = 0;
+    let im = 0;
+    const angBase = -2 * Math.PI * k / n;
+    for (let i = 0; i < n; i++) {
+      const ang = angBase * i;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      const v = x[i];
+      re += v * c;
+      im += v * s;
+    }
+
+    const p = re * re + im * im;
+    bandPower += p;
+    weightedFreqSum += f * p;
+    if (p > peakPower) {
+      peakPower = p;
+      peakFreq = f;
+    }
+  }
+
+  if (!(bandPower > 0) || !(peakFreq > 0)) {
+    return { mean: 0, std: 0, changeRate: 0 };
+  }
+
+  const meanFreq = weightedFreqSum / bandPower;
+  let varFreq = 0;
+  for (let k = 1; k <= maxK; k++) {
+    const f = (k * fs) / n;
+    if (f < fMin || f > fMax) continue;
+
+    let re = 0;
+    let im = 0;
+    const angBase = -2 * Math.PI * k / n;
+    for (let i = 0; i < n; i++) {
+      const ang = angBase * i;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      const v = x[i];
+      re += v * c;
+      im += v * s;
+    }
+    const p = re * re + im * im;
+    const d = f - meanFreq;
+    varFreq += p * d * d;
+  }
+  varFreq /= bandPower;
+
+  const respMean = meanFreq * 60;
+  const respStd = Math.sqrt(Math.max(0, varFreq)) * 60;
+  const respChangeRate = respMean > 0 ? (respStd * 100) / respMean : 0;
+
+  return {
+    mean: respMean,
+    std: respStd,
+    changeRate: respChangeRate
+  };
+}
+
 function computeEmgTimeFeatures(data) {
   const n = data.length;
   if (!n) return { mav: 0, rms: 0, iemg: 0, maxAmp: 0 };
@@ -259,6 +368,7 @@ function analyzeECG(filePath) {
     if (hrMean > 0 && hrStd > 0) {
       hrChangeRate = hrStd * 100 / hrMean;
     }
+    const respMetrics = estimateRespMetricsFromRR(rrMs);
 
     // Downsample if too large (target ~20k points for smooth rendering)
     const { data: sampledData, stride } = downsampleSignal(data, 20000);
@@ -280,7 +390,10 @@ function analyzeECG(filePath) {
         pNN50_pct_ECG: pnn50,
         HR_Mean_ECG: hrMean,
         HR_Std_ECG: hrStd,
-        HR_Change_Rate_ECG: hrChangeRate
+        HR_Change_Rate_ECG: hrChangeRate,
+        Resp_Mean_ECG: respMetrics.mean,
+        Resp_Std_ECG: respMetrics.std,
+        Resp_Change_Rate_ECG: respMetrics.changeRate
       }
     };
 

@@ -615,7 +615,10 @@ ipcMain.handle('export:unifiedCsv', async () => {
             'pNN50_pct_ECG',
             'HR_Mean_ECG',
             'HR_Std_ECG',
-            'HR_Change_Rate_ECG'
+            'HR_Change_Rate_ECG',
+            'Resp_Mean_ECG',
+            'Resp_Std_ECG',
+            'Resp_Change_Rate_ECG'
           ].forEach(k => copyIfPresent(k, k));
         } else if (file.startsWith('emg_')) {
           copyIfPresent('Arm_MAV', 'Arm_MAV');
@@ -725,6 +728,9 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: 'HR_Mean_ECG', key: 'HR_Mean_ECG' },
       { header: 'HR_Std_ECG', key: 'HR_Std_ECG' },
       { header: 'HR_Change_Rate_ECG', key: 'HR_Change_Rate_ECG' },
+      { header: 'Resp_Mean_ECG', key: 'Resp_Mean_ECG' },
+      { header: 'Resp_Std_ECG', key: 'Resp_Std_ECG' },
+      { header: 'Resp_Change_Rate_ECG', key: 'Resp_Change_Rate_ECG' },
       { header: 'Arm_MAV_EMG', key: 'Arm_MAV' },
       { header: 'Arm_MDF_EMG', key: 'Arm_MDF' },
       { header: 'Arm_MPF_EMG', key: 'Arm_MPF' },
@@ -1005,7 +1011,10 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         { label: 'pNN50_pct_ECG', keys: ['pNN50_pct_ECG'] },
         { label: 'HR_Mean_ECG', keys: ['HR_Mean_ECG'] },
         { label: 'HR_Std_ECG', keys: ['HR_Std_ECG'] },
-        { label: 'HR_Change_Rate_ECG', keys: ['HR_Change_Rate_ECG'] }
+        { label: 'HR_Change_Rate_ECG', keys: ['HR_Change_Rate_ECG'] },
+        { label: 'Resp_Mean_ECG', keys: ['Resp_Mean_ECG'] },
+        { label: 'Resp_Std_ECG', keys: ['Resp_Std_ECG'] },
+        { label: 'Resp_Change_Rate_ECG', keys: ['Resp_Change_Rate_ECG'] }
     ];
 
     const fallbackEmgMetrics = [

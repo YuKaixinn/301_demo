@@ -46,6 +46,9 @@
 | HR_Mean_ECG | 平均心率 | bpm | ECG |
 | HR_Std_ECG | 心率标准差 | bpm | ECG |
 | HR_Change_Rate_ECG | 心率变化率 | % | ECG |
+| Resp_Mean_ECG | 平均呼吸率 | 次/分钟 | ECG（由 RR 间期估计） |
+| Resp_Std_ECG | 呼吸率标准差 | 次/分钟 | ECG（由 RR 间期估计） |
+| Resp_Change_Rate_ECG | 呼吸率变化率 | % | ECG（由 RR 间期估计） |
 | Arm_MAV_EMG | 上肢肌电平均绝对值 | 依设备输出 | EMG |
 | Arm_MDF_EMG | 上肢肌电中值频率 | Hz | EMG |
 | Arm_MPF_EMG | 上肢肌电平均功率频率 | Hz | EMG |

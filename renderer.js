@@ -901,7 +901,10 @@ function renderEcgResult(d, subjectId) {
       ['pNN50_pct_ECG (%)', m.pNN50_pct_ECG],
       ['平均心率 HR_Mean_ECG (bpm)', m.HR_Mean_ECG],
       ['心率标准差 HR_Std_ECG (bpm)', m.HR_Std_ECG],
-      ['心率变异率 HR_Change_Rate_ECG (%)', m.HR_Change_Rate_ECG]
+      ['心率变异率 HR_Change_Rate_ECG (%)', m.HR_Change_Rate_ECG],
+      ['平均呼吸率 Resp_Mean_ECG (rpm)', m.Resp_Mean_ECG],
+      ['呼吸率标准差 Resp_Std_ECG (rpm)', m.Resp_Std_ECG],
+      ['呼吸率变化率 Resp_Change_Rate_ECG (%)', m.Resp_Change_Rate_ECG]
     ];
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
