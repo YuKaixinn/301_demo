@@ -7,7 +7,28 @@ function getStd(array) {
   if (!array || array.length === 0) return 0;
   const n = array.length;
   const mean = array.reduce((a, b) => a + b, 0) / n;
-  return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / n);
+  if (n < 2) return 0;
+  return Math.sqrt(array.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / (n - 1));
+}
+
+function getMedian(array) {
+  if (!array || array.length === 0) return 0;
+  const sorted = [...array].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[mid];
+  return (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function filterRRIntervals(rrMs) {
+  if (!rrMs || rrMs.length === 0) return [];
+  const withinRange = rrMs.filter(v => v > 300 && v < 2000);
+  if (withinRange.length < 4) return withinRange;
+  const median = getMedian(withinRange);
+  const absDev = withinRange.map(v => Math.abs(v - median));
+  const mad = getMedian(absDev);
+  if (!(mad > 0)) return withinRange;
+  const threshold = 5 * mad;
+  return withinRange.filter(v => Math.abs(v - median) <= threshold);
 }
 
 /**
@@ -129,110 +150,6 @@ function detectRPeaks(signal, sampleRate) {
  * Estimates respiration-related metrics from RR tachogram spectrum.
  * Respiration band is constrained to 0.1-0.5 Hz.
  */
-function estimateRespMetricsFromRR(rrMs) {
-  if (!rrMs || rrMs.length < 4) {
-    return { mean: 0, std: 0, changeRate: 0 };
-  }
-
-  const n = rrMs.length;
-  const rrSec = new Float64Array(n);
-  let rrSecSum = 0;
-  for (let i = 0; i < n; i++) {
-    const v = rrMs[i] / 1000;
-    rrSec[i] = v;
-    rrSecSum += v;
-  }
-  const meanRRsec = rrSecSum / n;
-  if (!(meanRRsec > 0)) {
-    return { mean: 0, std: 0, changeRate: 0 };
-  }
-
-  // RR tachogram is sampled once per beat.
-  const fs = 1 / meanRRsec;
-  const nyquist = fs / 2;
-  const fMin = 0.1;
-  const fMax = Math.min(0.5, nyquist);
-  if (!(fMax > fMin)) {
-    return { mean: 0, std: 0, changeRate: 0 };
-  }
-
-  let mean = 0;
-  for (let i = 0; i < n; i++) mean += rrSec[i];
-  mean /= n;
-
-  const x = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    x[i] = rrSec[i] - mean;
-  }
-
-  const maxK = Math.floor(n / 2);
-  let bandPower = 0;
-  let weightedFreqSum = 0;
-  let peakPower = 0;
-  let peakFreq = 0;
-
-  for (let k = 1; k <= maxK; k++) {
-    const f = (k * fs) / n;
-    if (f < fMin || f > fMax) continue;
-
-    let re = 0;
-    let im = 0;
-    const angBase = -2 * Math.PI * k / n;
-    for (let i = 0; i < n; i++) {
-      const ang = angBase * i;
-      const c = Math.cos(ang);
-      const s = Math.sin(ang);
-      const v = x[i];
-      re += v * c;
-      im += v * s;
-    }
-
-    const p = re * re + im * im;
-    bandPower += p;
-    weightedFreqSum += f * p;
-    if (p > peakPower) {
-      peakPower = p;
-      peakFreq = f;
-    }
-  }
-
-  if (!(bandPower > 0) || !(peakFreq > 0)) {
-    return { mean: 0, std: 0, changeRate: 0 };
-  }
-
-  const meanFreq = weightedFreqSum / bandPower;
-  let varFreq = 0;
-  for (let k = 1; k <= maxK; k++) {
-    const f = (k * fs) / n;
-    if (f < fMin || f > fMax) continue;
-
-    let re = 0;
-    let im = 0;
-    const angBase = -2 * Math.PI * k / n;
-    for (let i = 0; i < n; i++) {
-      const ang = angBase * i;
-      const c = Math.cos(ang);
-      const s = Math.sin(ang);
-      const v = x[i];
-      re += v * c;
-      im += v * s;
-    }
-    const p = re * re + im * im;
-    const d = f - meanFreq;
-    varFreq += p * d * d;
-  }
-  varFreq /= bandPower;
-
-  const respMean = meanFreq * 60;
-  const respStd = Math.sqrt(Math.max(0, varFreq)) * 60;
-  const respChangeRate = respMean > 0 ? (respStd * 100) / respMean : 0;
-
-  return {
-    mean: respMean,
-    std: respStd,
-    changeRate: respChangeRate
-  };
-}
 
 function computeEmgTimeFeatures(data) {
   const n = data.length;
@@ -289,19 +206,19 @@ function computeEmgFreqFeatures(data, sampleRate) {
   const df = sampleRate / n;
   let cum = 0;
   const halfPower = totalPower * 0.5;
-  let mdf = 0;
+  let mdf = null;
   let num = 0;
   for (let k = 0; k < maxK; k++) {
     const p = psd[k];
     const f = k * df;
     cum += p;
-    if (!mdf && cum >= halfPower) {
+    if (mdf === null && cum >= halfPower) {
       mdf = f;
     }
     num += f * p;
   }
   const mpf = num / totalPower;
-  return { mdf, mpf };
+  return { mdf: mdf == null ? 0 : mdf, mpf };
 }
 
 function analyzeECG(filePath) {
@@ -323,22 +240,24 @@ function analyzeECG(filePath) {
       rrSamples.push(peaks[i] - peaks[i - 1]);
     }
     const rrMs = rrSamples.map(v => v * 1000 / sampleRate);
+    const rrMsFiltered = filterRRIntervals(rrMs);
+    const rrMsUsed = rrMsFiltered.length >= 2 ? rrMsFiltered : rrMs;
     let meanRR = 0;
-    if (rrMs.length > 0) {
+    if (rrMsUsed.length > 0) {
       let s = 0;
-      for (let i = 0; i < rrMs.length; i++) s += rrMs[i];
-      meanRR = s / rrMs.length;
+      for (let i = 0; i < rrMsUsed.length; i++) s += rrMsUsed[i];
+      meanRR = s / rrMsUsed.length;
     }
     let sdnn = 0;
-    if (rrMs.length > 1) {
-      sdnn = getStd(rrMs);
+    if (rrMsUsed.length > 1) {
+      sdnn = getStd(rrMsUsed);
     }
     let rmssd = 0;
     let pnn50 = 0;
-    if (rrMs.length > 1) {
+    if (rrMsUsed.length > 1) {
       const diffs = [];
-      for (let i = 1; i < rrMs.length; i++) {
-        const d = rrMs[i] - rrMs[i - 1];
+      for (let i = 1; i < rrMsUsed.length; i++) {
+        const d = rrMsUsed[i] - rrMsUsed[i - 1];
         diffs.push(d);
       }
       if (diffs.length > 0) {
@@ -353,7 +272,7 @@ function analyzeECG(filePath) {
         pnn50 = (countNN50 * 100) / diffs.length;
       }
     }
-    const hrSeries = rrMs.filter(v => v > 0).map(v => 60000 / v);
+    const hrSeries = rrMsUsed.filter(v => v > 0).map(v => 60000 / v);
     let hrMean = 0;
     let hrStd = 0;
     if (hrSeries.length > 0) {
@@ -366,10 +285,8 @@ function analyzeECG(filePath) {
     }
     let hrChangeRate = 0;
     if (hrMean > 0 && hrStd > 0) {
-      hrChangeRate = hrStd * 100 / hrMean;
+      hrChangeRate = hrStd / hrMean;
     }
-    const respMetrics = estimateRespMetricsFromRR(rrMs);
-
     // Downsample if too large (target ~20k points for smooth rendering)
     const { data: sampledData, stride } = downsampleSignal(data, 20000);
 
@@ -390,10 +307,7 @@ function analyzeECG(filePath) {
         pNN50_pct_ECG: pnn50,
         HR_Mean_ECG: hrMean,
         HR_Std_ECG: hrStd,
-        HR_Change_Rate_ECG: hrChangeRate,
-        Resp_Mean_ECG: respMetrics.mean,
-        Resp_Std_ECG: respMetrics.std,
-        Resp_Change_Rate_ECG: respMetrics.changeRate
+        HR_Change_Rate_ECG: hrChangeRate
       }
     };
 
@@ -407,16 +321,24 @@ function analyzeEMG(filePath) {
   try {
     if (!fs.existsSync(filePath)) throw new Error('File not found');
     const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.trim().split('\n');
+    let sampleRate = 2000;
+    if (lines.length > 0 && /[a-zA-Z]/.test(lines[0])) {
+      const srMatch = lines[0].match(/rate.*?(\d+)/i);
+      if (srMatch) {
+        sampleRate = parseInt(srMatch[1]);
+      }
+    }
     const rows = parseDataFile(content, 4);
     const chArm = [];
     const chNeck = [];
+    const neckScale = 0.5;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (r.length > 0) chArm.push(r[0]);
-      if (r.length > 1) chNeck.push(r[1]);
+      if (r.length > 1) chNeck.push(r[1] * neckScale);
     }
     if (chArm.length === 0) throw new Error('No valid EMG data found');
-    const sampleRate = 1000;
     const { mav: armMav, rms: armRms, iemg: armIemg, maxAmp: armMax } = computeEmgTimeFeatures(chArm);
     const { mdf: armMdf, mpf: armMpf } = computeEmgFreqFeatures(chArm, sampleRate);
     let neckMav = null;
@@ -434,8 +356,12 @@ function analyzeEMG(filePath) {
         }
       }
       if (hasNonZero) {
-        const t = computeEmgTimeFeatures(chNeck);
-        const f = computeEmgFreqFeatures(chNeck, sampleRate);
+        let neckMean = 0;
+        for (let i = 0; i < chNeck.length; i++) neckMean += chNeck[i];
+        neckMean = chNeck.length > 0 ? neckMean / chNeck.length : 0;
+        const neckCentered = chNeck.map(v => v - neckMean);
+        const t = computeEmgTimeFeatures(neckCentered);
+        const f = computeEmgFreqFeatures(neckCentered, sampleRate);
         neckMav = t.mav;
         neckRms = t.rms;
         neckIemg = t.iemg;
@@ -573,7 +499,6 @@ function analyzeEye(filePath) {
         }
 
         let timeIdx = -1;
-        let timeScaleMs = 1;
         Object.keys(colMap).forEach(name => {
             const lower = name.toLowerCase();
             if (timeIdx === -1 && (lower.includes('time') || lower.includes('timestamp'))) {
@@ -594,11 +519,15 @@ function analyzeEye(filePath) {
         });
 
         let lOpenIdx = -1;
+        let rOpenIdx = -1;
         let lSqueezeIdx = -1;
         Object.keys(colMap).forEach(name => {
             const lower = name.toLowerCase();
             if (lOpenIdx === -1 && lower.includes('open') && (lower.includes('l_') || lower.includes('left'))) {
                 lOpenIdx = colMap[name];
+            }
+            if (rOpenIdx === -1 && lower.includes('open') && (lower.includes('r_') || lower.includes('right'))) {
+                rOpenIdx = colMap[name];
             }
             if (lSqueezeIdx === -1 && lower.includes('squeeze') && (lower.includes('l_') || lower.includes('left'))) {
                 lSqueezeIdx = colMap[name];
@@ -620,11 +549,16 @@ function analyzeEye(filePath) {
         const yawArr = [];
         const pitchArr = [];
         const timeArr = [];
+        const lVecArr = [];
+        const rVecArr = [];
+        const avgVecArr = [];
         const pupilLArr = [];
         const pupilRArr = [];
         const openLArr = [];
+        const openRArr = [];
         const squeezeLArr = [];
-        const blinkArr = [];
+        const blinkArrL = [];
+        const blinkArrR = [];
 
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -659,8 +593,17 @@ function analyzeEye(filePath) {
 
             let t = null;
             if (timeIdx >= 0 && timeIdx < parts.length) {
-                const tv = parseFloat(parts[timeIdx]);
-                if (!isNaN(tv)) t = tv;
+                const raw = parts[timeIdx];
+                let parsed = null;
+                if (typeof raw === 'string' && (raw.includes('-') || raw.includes('T') || raw.includes(':'))) {
+                    const dt = Date.parse(raw);
+                    if (!isNaN(dt)) parsed = dt;
+                }
+                if (parsed == null) {
+                    const tv = parseFloat(raw);
+                    if (!isNaN(tv)) parsed = tv;
+                }
+                t = parsed;
             }
             timeArr.push(t);
 
@@ -673,12 +616,20 @@ function analyzeEye(filePath) {
                 if (!isNaN(pv)) pupilRArr.push(pv);
             }
             let ovSample = null;
+            let ovSampleR = null;
             let svSample = null;
             if (lOpenIdx >= 0 && lOpenIdx < parts.length) {
                 const ov = parseFloat(parts[lOpenIdx]);
                 if (!isNaN(ov)) {
                     openLArr.push(ov);
                     ovSample = ov;
+                }
+            }
+            if (rOpenIdx >= 0 && rOpenIdx < parts.length) {
+                const ov = parseFloat(parts[rOpenIdx]);
+                if (!isNaN(ov)) {
+                    openRArr.push(ov);
+                    ovSampleR = ov;
                 }
             }
             if (lSqueezeIdx >= 0 && lSqueezeIdx < parts.length) {
@@ -688,19 +639,26 @@ function analyzeEye(filePath) {
                     svSample = sv;
                 }
             }
-            let blinkFlag = 0;
-            if (blinkIdx >= 0 && blinkIdx < parts.length) {
+            let blinkFlagL = 0;
+            let blinkFlagR = 0;
+            if (ovSample !== null) {
+                blinkFlagL = ovSample < 0.85 ? 1 : 0;
+            } else if (blinkIdx >= 0 && blinkIdx < parts.length) {
                 const bv = parseFloat(parts[blinkIdx]);
-                blinkFlag = isNaN(bv) ? 0 : (bv > 0.2 ? 1 : 0);
-            } else {
-                if (ovSample !== null && ovSample < 0.7) {
-                    blinkFlag = 1;
-                }
-                if (svSample !== null && svSample > 0.3) {
-                    blinkFlag = 1;
-                }
+                blinkFlagL = isNaN(bv) ? 0 : (bv > 0.15 ? 1 : 0);
             }
-            blinkArr.push(blinkFlag);
+            if (ovSampleR !== null) {
+                blinkFlagR = ovSampleR < 0.85 ? 1 : 0;
+            } else if (blinkIdx >= 0 && blinkIdx < parts.length) {
+                const bv = parseFloat(parts[blinkIdx]);
+                blinkFlagR = isNaN(bv) ? 0 : (bv > 0.15 ? 1 : 0);
+            }
+            blinkArrL.push(blinkFlagL);
+            blinkArrR.push(blinkFlagR);
+
+            lVecArr.push(vL);
+            rVecArr.push(vR);
+            avgVecArr.push([ax, ay, az]);
 
             let xIdx = Math.floor(yaw + 180); 
             let yIdx = Math.floor(pitch + 90);
@@ -764,151 +722,255 @@ function analyzeEye(filePath) {
             avgSqueezeL = s / squeezeLArr.length;
         }
 
-        let dtMs = null;
+        let dtSecArr = [];
+        let medianDtSec = 1 / 120;
         if (timeIdx >= 0 && timeArr.length > 1) {
-            let first = null;
-            let last = null;
+            const times = [];
             for (let i = 0; i < timeArr.length; i++) {
-                if (timeArr[i] != null) {
-                    if (first == null) first = timeArr[i];
-                    last = timeArr[i];
+                if (timeArr[i] != null) times.push(timeArr[i]);
+            }
+            if (times.length > 1) {
+                const diffs = [];
+                for (let i = 1; i < times.length; i++) {
+                    const d = times[i] - times[i - 1];
+                    if (d > 0) diffs.push(d);
+                }
+                if (diffs.length > 0) {
+                    diffs.sort((a, b) => a - b);
+                    const mid = Math.floor(diffs.length / 2);
+                    const med = diffs.length % 2 === 1 ? diffs[mid] : (diffs[mid - 1] + diffs[mid]) / 2;
+                    const scale = med > 1 ? 0.001 : 1;
+                    dtSecArr = diffs.map(d => d * scale);
+                    const validDt = dtSecArr.filter(v => v > 0 && v < 1.0);
+                    const base = validDt.length > 0 ? validDt : dtSecArr.filter(v => v > 0);
+                    if (base.length > 0) {
+                        base.sort((a, b) => a - b);
+                        const m = Math.floor(base.length / 2);
+                        medianDtSec = base.length % 2 === 1 ? base[m] : (base[m - 1] + base[m]) / 2;
+                    }
                 }
             }
-            if (first != null && last != null && last > first) {
-                const total = last - first;
-                const steps = timeArr.length - 1;
-                dtMs = total / steps;
-                if (total > 0 && total < 1e6) {
-                    timeScaleMs = 1000;
+        }
+        if (medianDtSec <= 0 || !isFinite(medianDtSec)) medianDtSec = 1 / 120;
+
+        const nSamples = avgVecArr.length;
+        const dtArr = new Array(nSamples).fill(medianDtSec);
+        if (dtSecArr.length > 0) {
+            for (let i = 1; i < nSamples; i++) {
+                const idx = i - 1;
+                const v = dtSecArr[idx];
+                if (v > 0 && isFinite(v)) dtArr[i] = v;
+            }
+        }
+        const timeSecArr = new Array(nSamples).fill(0);
+        for (let i = 1; i < nSamples; i++) {
+            timeSecArr[i] = timeSecArr[i - 1] + dtArr[i];
+        }
+        const effectiveIntervals = dtArr.filter(v => v < 2.0);
+        const effectiveDurationSec = effectiveIntervals.reduce((a, b) => a + b, 0);
+
+        const dots = [];
+        for (let i = 1; i < avgVecArr.length; i++) {
+            const a = avgVecArr[i - 1];
+            const b = avgVecArr[i];
+            let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+            if (dot > 1) dot = 1;
+            if (dot < -1) dot = -1;
+            dots.push(dot);
+        }
+        const stepAngles = dots.map(d => Math.acos(d) * (180 / Math.PI));
+        stepAngles.unshift(0);
+        const instantVelocity = stepAngles.map((a, i) => {
+            const dt = dtArr[i] > 0 ? dtArr[i] : medianDtSec;
+            const v = a / dt;
+            return v > 1000 ? 0 : v;
+        });
+
+        const RADIUS_THRESHOLD = 1.0;
+        const MIN_DURATION = 0.10;
+        const fixations = [];
+        let i = 0;
+        while (i < nSamples) {
+            let windowSize = Math.floor(MIN_DURATION / medianDtSec);
+            if (windowSize < 2) windowSize = 2;
+            if (i + windowSize > nSamples) break;
+            const windowIdxs = [];
+            for (let k = i; k < i + windowSize; k++) windowIdxs.push(k);
+            let maxDt = 0;
+            for (let k = 1; k < windowIdxs.length; k++) {
+                const d = dtArr[windowIdxs[k]];
+                if (d > maxDt) maxDt = d;
+            }
+            if (maxDt > 0.05) {
+                i += 1;
+                continue;
+            }
+            let cx = 0, cy = 0, cz = 0;
+            for (let k = 0; k < windowIdxs.length; k++) {
+                const v = avgVecArr[windowIdxs[k]];
+                cx += v[0]; cy += v[1]; cz += v[2];
+            }
+            const clen = Math.sqrt(cx * cx + cy * cy + cz * cz);
+            if (clen === 0) {
+                i += 1;
+                continue;
+            }
+            cx /= clen; cy /= clen; cz /= clen;
+            let maxAngle = 0;
+            for (let k = 0; k < windowIdxs.length; k++) {
+                const v = avgVecArr[windowIdxs[k]];
+                let dot = v[0] * cx + v[1] * cy + v[2] * cz;
+                if (dot > 1) dot = 1;
+                if (dot < -1) dot = -1;
+                const ang = Math.acos(dot) * (180 / Math.PI);
+                if (ang > maxAngle) maxAngle = ang;
+            }
+            if (maxAngle <= RADIUS_THRESHOLD) {
+                while (i + windowIdxs.length < nSamples) {
+                    const nextIdx = i + windowIdxs.length;
+                    if (dtArr[nextIdx] > 0.05) break;
+                    const v = avgVecArr[nextIdx];
+                    let dot = v[0] * cx + v[1] * cy + v[2] * cz;
+                    if (dot > 1) dot = 1;
+                    if (dot < -1) dot = -1;
+                    const ang = Math.acos(dot) * (180 / Math.PI);
+                    if (ang <= RADIUS_THRESHOLD) {
+                        windowIdxs.push(nextIdx);
+                    } else {
+                        break;
+                    }
+                }
+                const startIdx = windowIdxs[0];
+                const endIdx = windowIdxs[windowIdxs.length - 1];
+                const dur = timeSecArr[endIdx] - timeSecArr[startIdx];
+                if (dur >= MIN_DURATION) {
+                    fixations.push({
+                        start_idx: startIdx,
+                        end_idx: endIdx,
+                        start_time: timeSecArr[startIdx],
+                        end_time: timeSecArr[endIdx],
+                        duration: dur,
+                        centroid: [cx, cy, cz]
+                    });
+                    i += windowIdxs.length;
                 } else {
-                    timeScaleMs = 1;
+                    i += 1;
                 }
+            } else {
+                i += 1;
             }
         }
-        if (dtMs == null) {
-            dtMs = 1000 / 120;
-            timeScaleMs = 1;
+
+        const saccades = [];
+        for (let k = 0; k < fixations.length - 1; k++) {
+            const f1 = fixations[k];
+            const f2 = fixations[k + 1];
+            const gapDur = f2.start_time - f1.end_time;
+            if (gapDur > 0.005 && gapDur < 0.30) {
+                const idxStart = f1.end_idx;
+                const idxEnd = f2.start_idx;
+                const vLStart = lVecArr[idxStart];
+                const vLEnd = lVecArr[idxEnd];
+                const vRStart = rVecArr[idxStart];
+                const vREnd = rVecArr[idxEnd];
+                const c1 = f1.centroid;
+                const c2 = f2.centroid;
+                let dotL = vLStart[0] * vLEnd[0] + vLStart[1] * vLEnd[1] + vLStart[2] * vLEnd[2];
+                let dotR = vRStart[0] * vREnd[0] + vRStart[1] * vREnd[1] + vRStart[2] * vREnd[2];
+                let dotC = c1[0] * c2[0] + c1[1] * c2[1] + c1[2] * c2[2];
+                if (dotL > 1) dotL = 1;
+                if (dotL < -1) dotL = -1;
+                if (dotR > 1) dotR = 1;
+                if (dotR < -1) dotR = -1;
+                if (dotC > 1) dotC = 1;
+                if (dotC < -1) dotC = -1;
+                const ampL = Math.acos(dotL) * (180 / Math.PI);
+                const ampR = Math.acos(dotR) * (180 / Math.PI);
+                const ampCyclopean = Math.acos(dotC) * (180 / Math.PI);
+                const avgVel = ampCyclopean / gapDur;
+                const searchStart = Math.max(0, idxStart - 1);
+                const searchEnd = Math.min(instantVelocity.length, idxEnd + 1);
+                let peakVel = avgVel;
+                if (searchEnd > searchStart) {
+                    let maxVel = 0;
+                    for (let s = searchStart; s < searchEnd; s++) {
+                        const v = instantVelocity[s];
+                        if (v > maxVel) maxVel = v;
+                    }
+                    if (maxVel > 0) peakVel = Math.max(maxVel, avgVel);
+                }
+                saccades.push({
+                    duration: gapDur,
+                    amp_cyclopean: ampCyclopean,
+                    amp_l: ampL,
+                    amp_r: ampR,
+                    avg_velocity: avgVel,
+                    peak_velocity: peakVel
+                });
+            }
         }
 
-        const nSamples = blinkArr.length;
-        let blinkCount = 0;
-        let shortBlinkCount = 0;
-        let blinkDurTotalMs = 0;
-        let inBlink = false;
-        let blinkLen = 0;
-        for (let i = 0; i < nSamples; i++) {
-            const b = blinkArr[i] === 1;
-            if (b) {
-                blinkLen += 1;
-                if (!inBlink) {
+        const minBlinkDurSec = 0.08;
+        const maxBlinkDurSec = 0.60;
+        const computeBlinkStats = (arr) => {
+            let blinkCount = 0;
+            let blinkDurTotalMs = 0;
+            let shortBlinkCount = 0;
+            let inBlink = false;
+            let blinkDurSec = 0;
+            for (let i = 0; i < arr.length; i++) {
+                const isBlink = arr[i] === 1;
+                const dt = dtArr[i] > 0 ? dtArr[i] : medianDtSec;
+                if (isBlink) {
                     inBlink = true;
+                    blinkDurSec += dt;
+                } else if (inBlink) {
+                    if (blinkDurSec >= minBlinkDurSec && blinkDurSec <= maxBlinkDurSec) {
+                        blinkCount += 1;
+                        blinkDurTotalMs += blinkDurSec * 1000;
+                        if (blinkDurSec * 1000 <= 100) shortBlinkCount += 1;
+                    }
+                    inBlink = false;
+                    blinkDurSec = 0;
                 }
-            } else if (inBlink) {
-                const durMs = blinkLen * dtMs;
-                blinkCount += 1;
-                blinkDurTotalMs += durMs;
-                if (durMs <= 100) {
-                    shortBlinkCount += 1;
+            }
+            if (inBlink) {
+                if (blinkDurSec >= minBlinkDurSec && blinkDurSec <= maxBlinkDurSec) {
+                    blinkCount += 1;
+                    blinkDurTotalMs += blinkDurSec * 1000;
+                    if (blinkDurSec * 1000 <= 100) shortBlinkCount += 1;
                 }
-                inBlink = false;
-                blinkLen = 0;
             }
-        }
-        if (inBlink && blinkLen > 0) {
-            const durMs = blinkLen * dtMs;
-            blinkCount += 1;
-            blinkDurTotalMs += durMs;
-            if (durMs <= 100) {
-                shortBlinkCount += 1;
-            }
-        }
-
-        let totalTimeSec = nSamples * dtMs / 1000;
-        let blinkFreq = 0;
-        let avgBlinkDurMs = null;
-        if (blinkCount > 0 && totalTimeSec > 0) {
-            blinkFreq = blinkCount / totalTimeSec;
-            avgBlinkDurMs = blinkDurTotalMs / blinkCount;
-        }
-        let samplingRateEst = null;
-        if (totalTimeSec > 0 && nSamples > 1) {
-            samplingRateEst = nSamples / totalTimeSec;
+            const avgBlinkDurMs = blinkCount > 0 ? blinkDurTotalMs / blinkCount : null;
+            return { blinkCount, shortBlinkCount, avgBlinkDurMs };
+        };
+        const leftStats = computeBlinkStats(blinkArrL);
+        const rightStats = computeBlinkStats(blinkArrR);
+        let blinkCount = leftStats.blinkCount;
+        let shortBlinkCount = leftStats.shortBlinkCount;
+        let avgBlinkDurMs = leftStats.avgBlinkDurMs;
+        if (rightStats.blinkCount > leftStats.blinkCount) {
+            blinkCount = rightStats.blinkCount;
+            shortBlinkCount = rightStats.shortBlinkCount;
+            avgBlinkDurMs = rightStats.avgBlinkDurMs;
         }
 
-        const nYaw = yawArr.length;
-        const ampArr = [];
-        for (let i = 1; i < nYaw; i++) {
-            const dy = yawArr[i] - yawArr[i - 1];
-            const dp = pitchArr[i] - pitchArr[i - 1];
-            const a = Math.sqrt(dy * dy + dp * dp);
-            ampArr.push(a);
-        }
+        const totalTimeSec = effectiveDurationSec;
+        const blinkFreq = totalTimeSec > 0 ? (blinkCount / totalTimeSec) * 60 : 0;
+        const samplingRateEst = medianDtSec > 0 ? 1 / medianDtSec : null;
 
-        let fixationCount = 0;
-        let fixationDurTotalMs = 0;
-        let saccadeCount = 0;
+        const fixationCount = fixations.length;
+        const fixationDurTotalMs = fixations.reduce((a, b) => a + b.duration * 1000, 0);
+        const avgFixDurMs = fixationCount > 0 ? fixationDurTotalMs / fixationCount : null;
+        const fixationFreq = totalTimeSec > 0 ? (fixationCount / totalTimeSec) * 60 : 0;
+
+        let saccadeCount = saccades.length;
         let saccAmpTotal = 0;
         let saccVelTotal = 0;
-        const fixThresh = 1;
-        const saccThresh = 2;
-        let inFix = false;
-        let fixLen = 0;
-        let inSacc = false;
-        let saccLen = 0;
-        let saccAmpSum = 0;
-        for (let i = 0; i < ampArr.length; i++) {
-            const a = ampArr[i];
-            const isFix = a < fixThresh;
-            const isSacc = a >= saccThresh;
-            if (isFix) {
-                fixLen += 1;
-                if (!inFix) inFix = true;
-            } else if (inFix) {
-                fixationCount += 1;
-                fixationDurTotalMs += fixLen * dtMs;
-                inFix = false;
-                fixLen = 0;
-            }
-            if (isSacc) {
-                saccLen += 1;
-                saccAmpSum += a;
-                if (!inSacc) inSacc = true;
-            } else if (inSacc) {
-                saccadeCount += 1;
-                // Accumulate total amplitude (path length) for this saccade
-                saccAmpTotal += saccAmpSum;
-                // Calculate velocity for this saccade (deg/s)
-                const durSec = (saccLen * dtMs) / 1000;
-                if (durSec > 0) {
-                    saccVelTotal += saccAmpSum / durSec;
-                }
-                inSacc = false;
-                saccLen = 0;
-                saccAmpSum = 0;
-            }
+        for (let i = 0; i < saccades.length; i++) {
+            saccAmpTotal += saccades[i].amp_cyclopean;
+            saccVelTotal += saccades[i].avg_velocity;
         }
-        if (inFix && fixLen > 0) {
-            fixationCount += 1;
-            fixationDurTotalMs += fixLen * dtMs;
-        }
-        if (inSacc && saccLen > 0) {
-            saccadeCount += 1;
-            saccAmpTotal += saccAmpSum;
-            const durSec = (saccLen * dtMs) / 1000;
-            if (durSec > 0) {
-                saccVelTotal += saccAmpSum / durSec;
-            }
-        }
-
-        let avgFixDurMs = null;
-        if (fixationCount > 0) {
-            avgFixDurMs = fixationDurTotalMs / fixationCount;
-        }
-        let fixationFreq = 0;
-        if (fixationCount > 0 && totalTimeSec > 0) {
-            fixationFreq = fixationCount / totalTimeSec;
-        }
-        
         let avgSaccAmp = null;
         let avgSaccVel = null;
         let saccadeRate = 0;
@@ -916,7 +978,7 @@ function analyzeEye(filePath) {
             avgSaccAmp = saccAmpTotal / saccadeCount;
             avgSaccVel = saccVelTotal / saccadeCount;
             if (totalTimeSec > 0) {
-                saccadeRate = saccadeCount / totalTimeSec;
+                saccadeRate = (saccadeCount / totalTimeSec) * 60;
             }
         }
         
