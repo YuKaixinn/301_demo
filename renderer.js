@@ -344,8 +344,11 @@ function computeQuestionnaireScores(cfg, answers) {
     坚韧_Psy: pickMetric(namedSubscales, '坚韧'),
     力量_Psy: pickMetric(namedSubscales, '力量'),
     乐观_Psy: pickMetric(namedSubscales, '乐观'),
-    心理弹性总分_Psy: pickNamed('心理弹性总分', '心理弹性总分'),
-    成就动机_Psy: pickMetric(namedSubscales, '成就动机总分')
+    进取_Psy: pickMetric(namedSubscales, '进取'),
+    主动_Psy: pickMetric(namedSubscales, '主动'),
+    求精_Psy: pickMetric(namedSubscales, '求精'),
+    奉献_Psy: pickMetric(namedSubscales, '奉献'),
+    乐业_Psy: pickMetric(namedSubscales, '乐业')
   };
   return {
     items: itemScores,
@@ -368,8 +371,11 @@ function buildQuestionnaireMetrics(scores) {
     坚韧: subNamed['坚韧'] ?? null,
     力量: subNamed['力量'] ?? null,
     乐观: subNamed['乐观'] ?? null,
-    心理弹性总分: subNamed['心理弹性总分'] ?? null,
-    成就动机: subNamed['成就动机总分'] ?? null
+    进取: subNamed['进取'] ?? null,
+    主动: subNamed['主动'] ?? null,
+    求精: subNamed['求精'] ?? null,
+    奉献: subNamed['奉献'] ?? null,
+    乐业: subNamed['乐业'] ?? null
   };
 }
 
@@ -432,7 +438,7 @@ async function renderQuestionnaireFields() {
       const itemId = getQuestionnaireItemId(item, index);
       const scale = getQuestionnaireScaleForItem(cfg, item);
       const labels = scale.labels || {};
-      const displayNo = (item && item.number != null) ? item.number : (idxInSection + 1);
+      const displayNo = idxInSection + 1;
 
       const group = document.createElement('div');
       group.style.marginBottom = '14px';
@@ -856,19 +862,23 @@ function renderEmgResult(d, subjectId) {
   if (grid) {
     grid.innerHTML = '';
     const m = d.metrics || {};
+    const blinkAnomalyAll = m.blink_anomaly_all === true;
+    const blinkAnomalyCount = typeof m.blink_anomaly_count === 'number' ? m.blink_anomaly_count : 0;
+    const blinkLabelSuffix = blinkAnomalyAll ? '（数据异常）' : (blinkAnomalyCount > 0 ? '（已剔除异常）' : '');
+    const blinkValue = (v) => blinkAnomalyAll ? '数据异常' : v;
     const rows = [
-      ['上肢肌电平均绝对值', m.Arm_MAV],
+      ['上肢肌电平均绝对值 (μV)', m.Arm_MAV],
       ['上肢肌电中值频率 (Hz)', m.Arm_MDF],
       ['上肢肌电平均功率频率 (Hz)', m.Arm_MPF],
-      ['上肢肌电均方根', m.Arm_RMS],
-      ['上肢肌电积分', m.Arm_iEMG],
-      ['上肢肌电最大幅值', m.Arm_Max_Amp],
-      ['颈部肌电平均绝对值', m.Neck_MAV],
+      ['上肢肌电均方根 (μV)', m.Arm_RMS],
+      ['上肢肌电积分 (μV·s)', m.Arm_iEMG],
+      ['上肢肌电最大幅值 (μV)', m.Arm_Max_Amp],
+      ['颈部肌电平均绝对值 (μV)', m.Neck_MAV],
       ['颈部肌电中值频率 (Hz)', m.Neck_MDF],
       ['颈部肌电平均功率频率 (Hz)', m.Neck_MPF],
-      ['颈部肌电均方根', m.Neck_RMS],
-      ['颈部肌电积分', m.Neck_iEMG],
-      ['颈部肌电最大幅值', m.Neck_Max_Amp]
+      ['颈部肌电均方根 (μV)', m.Neck_RMS],
+      ['颈部肌电积分 (μV·s)', m.Neck_iEMG],
+      ['颈部肌电最大幅值 (μV)', m.Neck_Max_Amp]
     ];
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
@@ -921,10 +931,7 @@ function renderEcgResult(d, subjectId) {
       ['相邻 RR 间期差值 >50ms 比例 (%)', m.pNN50_pct_ECG],
       ['平均心率 (bpm)', m.HR_Mean_ECG],
       ['心率标准差 (bpm)', m.HR_Std_ECG],
-      ['心率变化率 (%)', m.HR_Change_Rate_ECG],
-      ['平均呼吸率 (次/分钟)', m.Resp_Mean_ECG],
-      ['呼吸率标准差 (次/分钟)', m.Resp_Std_ECG],
-      ['呼吸率变化率 (%)', m.Resp_Change_Rate_ECG]
+      ['心率变化率', m.HR_Change_Rate_ECG]
     ];
     rows.forEach(([label, value]) => {
       const div = document.createElement('div');
@@ -985,15 +992,15 @@ function renderEyeResult(d, subjectId) {
 
     const rows = [
       ['由于增加了上面的三个指标', null], // Placeholder or wait, I don't need this right? Let me check the prompt: "数据分析模块中ecg，emg和眼动数据分析中，软件中展示的指标名称直接采用Neck_Max_Amp这种变量名，现将其全部改成中文名(单位)的形式，并优化指标的展示表格，使其紧凑且美观。"
-      ['眨眼次数 (次)', m.blink_count_Eye],
-      ['眨眼频率 (Hz)', m.blink_rate_Hz_Eye],
-      ['眨眼持续时间 (ms)', m.blink_dur_ms_Eye],
+      ['眨眼次数 (次)' + blinkLabelSuffix, blinkValue(m.blink_count_Eye)],
+      ['眨眼频率 (次/分钟)' + blinkLabelSuffix, blinkValue(m.blink_rate_Hz_Eye)],
+      ['眨眼持续时间 (ms)' + blinkLabelSuffix, blinkValue(m.blink_dur_ms_Eye)],
       ['注视次数 (次)', m.fixation_count_Eye],
-      ['注视频率 (Hz)', m.fixation_rate_Hz_Eye],
+      ['注视频率 (次/分钟)', m.fixation_rate_Hz_Eye],
       ['平均注视时长 (ms)', m.avg_fixation_dur_ms_Eye],
       ['平均瞳孔直径 (mm)', m.avg_pupil_diam_mm_Eye],
       ['扫视次数 (次)', m.saccade_count_Eye],
-      ['扫视频率 (Hz)', m.saccade_rate_Hz_Eye],
+      ['扫视频率 (次/分钟)', m.saccade_rate_Hz_Eye],
       ['平均扫视幅度 (度)', m.avg_saccade_amp_deg_Eye],
       ['平均扫视速度 (度/秒)', m.avg_saccade_vel_deg_s_Eye]
     ];
@@ -1092,8 +1099,11 @@ const questionnaireTheoreticalRanges = {
   坚韧: { min: 13, max: 65 },
   力量: { min: 8, max: 40 },
   乐观: { min: 4, max: 20 },
-  心理弹性总分: { min: 25, max: 125 },
-  成就动机总分: { min: 21, max: 105 }
+  进取: { min: 3, max: 15 },
+  主动: { min: 5, max: 25 },
+  求精: { min: 3, max: 15 },
+  奉献: { min: 5, max: 25 },
+  乐业: { min: 3, max: 15 }
 };
 
 function getQuestionnaireTheoreticalRangeByName(metricName) {
@@ -1147,52 +1157,7 @@ function getQuestionnaireCompositeRange(cfg, compositeId) {
 function renderQuestionnaireTable(containerId, scores, questionnaireCfg) {
   const container = document.getElementById(containerId);
   if (!container) return;
-
-  const subscales = scores.subscales_named || {};
-  const composites = scores.composites_named || {};
-  const metricDefs = [
-    {
-      label: '心理弹性总分',
-      value: Number(subscales['心理弹性总分'] || composites['心理弹性总分'] || 0),
-      range: getQuestionnaireSubscaleRange(questionnaireCfg, 'resilience_total')
-    },
-    {
-      label: '成就动机总分',
-      value: Number(subscales['成就动机总分'] || 0),
-      range: getQuestionnaireSubscaleRange(questionnaireCfg, 'achievement_motivation_total')
-    }
-  ];
-
-  const renderMetricCard = (metric) => {
-    const min = Number(metric.range.min || 0);
-    const max = Number(metric.range.max || 100);
-    const safeValue = Number.isFinite(metric.value) ? metric.value : 0;
-    const ratioRaw = max === min ? 0 : (safeValue - min) / (max - min);
-    const ratio = Math.max(0, Math.min(1, ratioRaw));
-    const markerLeft = (ratio * 100).toFixed(2);
-    return `
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-          <span style="font-size:14px;color:#334155;font-weight:600;">${metric.label}</span>
-          <span style="font-size:20px;color:#0f172a;font-weight:700;">${safeValue}</span>
-        </div>
-        <div style="position:relative;height:16px;border-radius:9999px;overflow:hidden;background:linear-gradient(to right,#ef4444 0%,#ef4444 33.333%,#f59e0b 33.333%,#f59e0b 66.666%,#10b981 66.666%,#10b981 100%);">
-          <span style="position:absolute;top:50%;left:${markerLeft}%;transform:translate(-50%,-50%);width:14px;height:14px;background:#111827;border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 0 1px rgba(15,23,42,0.15);"></span>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:#64748b;">
-          <span>最低 ${min}</span>
-          <span>最高 ${max}</span>
-        </div>
-      </div>
-    `;
-  };
-
-  container.innerHTML = `
-    <h5 style="margin:0 0 12px 0;color:#2563eb;font-size:15px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">关键指标</h5>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
-      ${metricDefs.map(renderMetricCard).join('')}
-    </div>
-  `;
+  container.innerHTML = '';
 }
 
 function renderQuestionnaireRadar(scores, questionnaireCfg) {
@@ -1218,6 +1183,18 @@ function renderQuestionnaireRadar(scores, questionnaireCfg) {
           { name: '坚韧', subscaleId: 'tenacity' },
           { name: '力量', subscaleId: 'strength' },
           { name: '乐观', subscaleId: 'optimism' }
+        ]
+      },
+      {
+        chartId: 'questionnaire-radar-achievement',
+        title: '成就动机',
+        color: '#0ea5e9',
+        dimensions: [
+          { name: '进取', subscaleId: 'ambition' },
+          { name: '主动', subscaleId: 'initiative' },
+          { name: '求精', subscaleId: 'excellence' },
+          { name: '奉献', subscaleId: 'dedication' },
+          { name: '乐业', subscaleId: 'job_satisfaction' }
         ]
       }
     ];

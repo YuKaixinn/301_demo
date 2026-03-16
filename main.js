@@ -265,11 +265,14 @@ function collectFeaturesForSubject(subjectIdRaw) {
         '坚韧',
         '力量',
         '乐观',
-        '心理弹性总分',
-        '成就动机'
+        '进取',
+        '主动',
+        '求精',
+        '奉献',
+        '乐业'
       ];
       questionnaireMetricKeys.forEach(k => {
-        const val = metrics[k] ?? subNamed[k] ?? compNamed[k] ?? subNamed[k === '成就动机' ? '成就动机总分' : k];
+        const val = metrics[k] ?? subNamed[k] ?? compNamed[k];
         if (val != null) {
           row[k] = val;
           row[`${k}_Psy`] = val;
@@ -584,7 +587,11 @@ ipcMain.handle('export:unifiedCsv', async () => {
           '力量',
           '乐观',
           '心理弹性总分',
-          '成就动机'
+          '进取',
+          '主动',
+          '求精',
+          '奉献',
+          '乐业'
         ];
         questionnaireKeys.forEach(k => {
           let val = null;
@@ -593,9 +600,6 @@ ipcMain.handle('export:unifiedCsv', async () => {
           else if (Object.prototype.hasOwnProperty.call(psy, k)) val = psy[k];
           else if (Object.prototype.hasOwnProperty.call(subNamed, k)) val = subNamed[k];
           else if (Object.prototype.hasOwnProperty.call(compNamed, k)) val = compNamed[k];
-          else if (k === '成就动机' && Object.prototype.hasOwnProperty.call(subNamed, '成就动机总分')) {
-            val = subNamed['成就动机总分'];
-          }
           if (val != null) row[k] = val;
         });
       } else if (file.startsWith('ecg_') || file.startsWith('emg_') || file.startsWith('eye_')) {
@@ -615,10 +619,7 @@ ipcMain.handle('export:unifiedCsv', async () => {
             'pNN50_pct_ECG',
             'HR_Mean_ECG',
             'HR_Std_ECG',
-            'HR_Change_Rate_ECG',
-            'Resp_Mean_ECG',
-            'Resp_Std_ECG',
-            'Resp_Change_Rate_ECG'
+            'HR_Change_Rate_ECG'
           ].forEach(k => copyIfPresent(k, k));
         } else if (file.startsWith('emg_')) {
           copyIfPresent('Arm_MAV', 'Arm_MAV');
@@ -708,8 +709,11 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: '坚韧', key: '坚韧' },
       { header: '力量', key: '力量' },
       { header: '乐观', key: '乐观' },
-      { header: '心理弹性总分', key: '心理弹性总分' },
-      { header: '成就动机', key: '成就动机' },
+      { header: '进取', key: '进取' },
+      { header: '主动', key: '主动' },
+      { header: '求精', key: '求精' },
+      { header: '奉献', key: '奉献' },
+      { header: '乐业', key: '乐业' },
       { header: '体能水平预测', key: 'ele_level_pred' },
       { header: '认知优势预测', key: 'cog_type_pred' },
       { header: '动机类型预测', key: 'mot_type_pred' },
@@ -728,9 +732,6 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: 'HR_Mean_ECG', key: 'HR_Mean_ECG' },
       { header: 'HR_Std_ECG', key: 'HR_Std_ECG' },
       { header: 'HR_Change_Rate_ECG', key: 'HR_Change_Rate_ECG' },
-      { header: 'Resp_Mean_ECG', key: 'Resp_Mean_ECG' },
-      { header: 'Resp_Std_ECG', key: 'Resp_Std_ECG' },
-      { header: 'Resp_Change_Rate_ECG', key: 'Resp_Change_Rate_ECG' },
       { header: 'Arm_MAV_EMG', key: 'Arm_MAV' },
       { header: 'Arm_MDF_EMG', key: 'Arm_MDF' },
       { header: 'Arm_MPF_EMG', key: 'Arm_MPF' },
@@ -929,7 +930,8 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
 
     const radarData = {
         bigfive: [getVal('神经质'), getVal('尽责性'), getVal('宜人性'), getVal('开放性'), getVal('外向性')],
-        psycap: [getVal('坚韧'), getVal('力量'), getVal('乐观')]
+        psycap: [getVal('坚韧'), getVal('力量'), getVal('乐观')],
+        achievement: [getVal('进取'), getVal('主动'), getVal('求精'), getVal('奉献'), getVal('乐业')]
     };
 
     // Helper for safe number formatting
@@ -956,11 +958,6 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         if (!Number.isFinite(num)) return String(val);
         return Number.isInteger(num) ? String(num) : num.toFixed(2);
     };
-
-    const questionnaireKeyMetrics = [
-        { label: '心理弹性总分', keys: ['心理弹性总分', '心理弹性总分_Psy'], min: 25, max: 125 },
-        { label: '成就动机总分', keys: ['成就动机总分', '成就动机', '成就动机_Psy'], min: 21, max: 105 }
-    ];
 
     const loadMetricConfig = (fileName) => {
         const candidates = [
@@ -1011,10 +1008,7 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         { label: 'pNN50_pct_ECG', keys: ['pNN50_pct_ECG'] },
         { label: 'HR_Mean_ECG', keys: ['HR_Mean_ECG'] },
         { label: 'HR_Std_ECG', keys: ['HR_Std_ECG'] },
-        { label: 'HR_Change_Rate_ECG', keys: ['HR_Change_Rate_ECG'] },
-        { label: 'Resp_Mean_ECG', keys: ['Resp_Mean_ECG'] },
-        { label: 'Resp_Std_ECG', keys: ['Resp_Std_ECG'] },
-        { label: 'Resp_Change_Rate_ECG', keys: ['Resp_Change_Rate_ECG'] }
+        { label: 'HR_Change_Rate_ECG', keys: ['HR_Change_Rate_ECG'] }
     ];
 
     const fallbackEmgMetrics = [
@@ -1066,33 +1060,6 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         return metrics.map(m => {
             const value = formatValue(pickFeature(m.keys));
             return `<tr><td>${m.label}</td><td>${value}</td></tr>`;
-        }).join('');
-    };
-
-    const renderMetricCards = (metrics) => {
-        return metrics.map(m => {
-            const raw = pickFeature(m.keys);
-            const num = Number(raw);
-            const valueText = formatValue(raw);
-            const valid = Number.isFinite(num);
-            const ratioRaw = valid && m.max !== m.min ? (num - m.min) / (m.max - m.min) : 0;
-            const ratio = Math.max(0, Math.min(1, ratioRaw));
-            const markerLeft = (ratio * 100).toFixed(2);
-            return `
-              <div class="metric-card">
-                <div class="metric-header">
-                  <span class="metric-label">${m.label}</span>
-                  <span class="metric-value">${valueText}</span>
-                </div>
-                <div class="metric-bar">
-                  <span class="metric-marker" style="left:${markerLeft}%"></span>
-                </div>
-                <div class="metric-scale">
-                  <span>最低 ${m.min}</span>
-                  <span>最高 ${m.max}</span>
-                </div>
-              </div>
-            `;
         }).join('');
     };
 
@@ -1172,33 +1139,30 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         'pNN50_pct_ECG': '相邻 RR 间期差值 >50ms 比例 (%)',
         'HR_Mean_ECG': '平均心率 (bpm)',
         'HR_Std_ECG': '心率标准差 (bpm)',
-        'HR_Change_Rate_ECG': '心率变化率 (%)',
-        'Resp_Mean_ECG': '平均呼吸率 (次/分钟)',
-        'Resp_Std_ECG': '呼吸率标准差',
-        'Resp_Change_Rate_ECG': '呼吸率变化率 (%)',
+        'HR_Change_Rate_ECG': '心率变化率',
         
-        'Arm_MAV': '上肢肌电平均绝对值',
+        'Arm_MAV': '上肢肌电平均绝对值 (μV)',
         'Arm_MDF': '上肢肌电中值频率 (Hz)',
         'Arm_MPF': '上肢肌电平均功率频率 (Hz)',
-        'Arm_RMS': '上肢肌电均方根',
-        'Arm_iEMG': '上肢肌电积分',
-        'Arm_Max_Amp': '上肢肌电最大幅值',
-        'Neck_MAV': '颈部肌电平均绝对值',
+        'Arm_RMS': '上肢肌电均方根 (μV)',
+        'Arm_iEMG': '上肢肌电积分 (μV·s)',
+        'Arm_Max_Amp': '上肢肌电最大幅值 (μV)',
+        'Neck_MAV': '颈部肌电平均绝对值 (μV)',
         'Neck_MDF': '颈部肌电中值频率 (Hz)',
         'Neck_MPF': '颈部肌电平均功率频率 (Hz)',
-        'Neck_RMS': '颈部肌电均方根',
-        'Neck_iEMG': '颈部肌电积分',
-        'Neck_Max_Amp': '颈部肌电最大幅值',
+        'Neck_RMS': '颈部肌电均方根 (μV)',
+        'Neck_iEMG': '颈部肌电积分 (μV·s)',
+        'Neck_Max_Amp': '颈部肌电最大幅值 (μV)',
 
         'blink_count_Eye': '眨眼次数 (次)',
-        'blink_rate_Hz_Eye': '眨眼频率 (Hz)',
+        'blink_rate_Hz_Eye': '眨眼频率 (次/分钟)',
         'blink_dur_ms_Eye': '眨眼持续时间 (ms)',
         'fixation_count_Eye': '注视次数 (次)',
-        'fixation_rate_Hz_Eye': '注视频率 (Hz)',
+        'fixation_rate_Hz_Eye': '注视频率 (次/分钟)',
         'avg_fixation_dur_ms_Eye': '平均注视时长 (ms)',
         'avg_pupil_diam_mm_Eye': '平均瞳孔直径 (mm)',
         'saccade_count_Eye': '扫视次数 (次)',
-        'saccade_rate_Hz_Eye': '扫视频率 (Hz)',
+        'saccade_rate_Hz_Eye': '扫视频率 (次/分钟)',
         'avg_saccade_amp_deg_Eye': '平均扫视幅度 (度)',
         'avg_saccade_vel_deg_s_Eye': '平均扫视速度 (度/秒)'
     };
@@ -1391,9 +1355,7 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         <div class="chart-row questionnaire-radar-row avoid-break">
             <div class="chart-box"><div class="chart-title">大五人格雷达</div><div class="chart-canvas" id="radar-bigfive"></div></div>
             <div class="chart-box"><div class="chart-title">心理弹性雷达</div><div class="chart-canvas" id="radar-psycap"></div></div>
-        </div>
-        <div class="metric-grid">
-            ${renderMetricCards(questionnaireKeyMetrics)}
+            <div class="chart-box"><div class="chart-title">成就动机雷达</div><div class="chart-canvas" id="radar-achievement"></div></div>
         </div>
 
         <h2>3. 生理指标分析 (Physiological Analysis)</h2>
@@ -1422,7 +1384,7 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         </div>
 
         <script>
-          const expectedCharts = ${5 + (ecgWaveAvailable ? 1 : 0) + (emgWaveAvailable ? 1 : 0)};
+          const expectedCharts = ${6 + (ecgWaveAvailable ? 1 : 0) + (emgWaveAvailable ? 1 : 0)};
           const readyIds = new Set();
           const markReadyById = (id) => {
             if (readyIds.has(id)) return;
@@ -1542,6 +1504,20 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
                 areaStyle: { opacity: 0.3, color: '#059669' },
                 lineStyle: { color: '#059669' },
                 itemStyle: { color: '#059669' }
+              }]
+            });
+
+            renderChartToImage('radar-achievement', {
+              radar: { indicator: [
+                {name: '进取', max: 15}, {name: '主动', max: 25}, {name: '求精', max: 15},
+                {name: '奉献', max: 25}, {name: '乐业', max: 15}
+              ], radius: '65%', center: ['50%', '55%'] },
+              series: [{
+                type: 'radar',
+                data: [{ value: rData.achievement, name: '成就动机' }],
+                areaStyle: { opacity: 0.3, color: '#0ea5e9' },
+                lineStyle: { color: '#0ea5e9' },
+                itemStyle: { color: '#0ea5e9' }
               }]
             });
 
@@ -2162,6 +2138,8 @@ ipcMain.handle('physio:computeEye', async (_event, subjectId) => {
   if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
 
   try {
+    const blinkKeys = new Set(['blink_count_Eye', 'blink_rate_Hz_Eye', 'blink_dur_ms_Eye', 'short_blink_count_Eye']);
+    const BLINK_COUNT_MIN = 1;
     const requiredTasks = [1, 2, 3, 4, 5];
     const selectedMap = new Map();
     result.filePaths.forEach(filePath => {
@@ -2189,14 +2167,20 @@ ipcMain.handle('physio:computeEye', async (_event, subjectId) => {
       const item = selectedMap.get(taskId);
       const analysis = analyzeEye(item.filePath);
       analysis.filename = item.name;
+      const blinkCount = analysis && analysis.metrics ? analysis.metrics.blink_count_Eye : null;
+      const blinkValid = typeof blinkCount === 'number' && !Number.isNaN(blinkCount) && blinkCount >= BLINK_COUNT_MIN;
+      analysis.blink_anomaly = !blinkValid;
       return analysis;
     });
 
     const metricSums = {};
     const metricCounts = {};
+    let blinkAnomalyCount = 0;
     results.forEach(res => {
+      if (res.blink_anomaly) blinkAnomalyCount += 1;
       const m = res.metrics || {};
       Object.keys(m).forEach(key => {
+        if (blinkKeys.has(key) && res.blink_anomaly) return;
         const val = m[key];
         if (typeof val === 'number' && !Number.isNaN(val)) {
           metricSums[key] = (metricSums[key] || 0) + val;
@@ -2209,6 +2193,14 @@ ipcMain.handle('physio:computeEye', async (_event, subjectId) => {
       const count = metricCounts[key] || 1;
       avgMetrics[key] = metricSums[key] / count;
     });
+    const blinkAnomalyAll = blinkAnomalyCount === results.length;
+    avgMetrics.blink_anomaly_count = blinkAnomalyCount;
+    avgMetrics.blink_anomaly_all = blinkAnomalyAll;
+    if (blinkAnomalyAll) {
+      blinkKeys.forEach(key => {
+        avgMetrics[key] = null;
+      });
+    }
 
     return {
       ok: true,
