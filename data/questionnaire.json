@@ -712,22 +712,6 @@
       "reverse_scored": false
     },
     {
-      "id": "AM12",
-      "section": "成就动机",
-      "number": 12,
-      "text": "遇到困难、阻力或失败，能够迅速摆脱失败带来的阴影，不气馁、不放弃或降低标准，想办法，并进行多次尝试。",
-      "scale_id": "likert5_agreement_alt",
-      "reverse_scored": false
-    },
-    {
-      "id": "AM13",
-      "section": "成就动机",
-      "number": 13,
-      "text": "为达到某一工作目的，而进行长时间的、反复的尝试；在某一职位上正常晋升年限，仍对前途有希望，努力工作；或功成名就且在事业上不能再有突破时，仍努力工作。",
-      "scale_id": "likert5_agreement_alt",
-      "reverse_scored": false
-    },
-    {
       "id": "AM14",
       "section": "成就动机",
       "number": 14,
@@ -927,61 +911,58 @@
         "aggregation": "sum"
       },
       {
-        "id": "resilience_total",
-        "name": "心理弹性总分",
-        "section": "心理弹性",
-        "item_ids": [
-          "RS01",
-          "RS02",
-          "RS03",
-          "RS04",
-          "RS05",
-          "RS06",
-          "RS07",
-          "RS08",
-          "RS09",
-          "RS10",
-          "RS11",
-          "RS12",
-          "RS13",
-          "RS14",
-          "RS15",
-          "RS16",
-          "RS17",
-          "RS18",
-          "RS19",
-          "RS20",
-          "RS21",
-          "RS22",
-          "RS23",
-          "RS24",
-          "RS25"
-        ],
-        "aggregation": "sum"
-      },
-      {
-        "id": "achievement_motivation_total",
-        "name": "成就动机总分",
+        "id": "ambition",
+        "name": "进取",
         "section": "成就动机",
         "item_ids": [
           "AM01",
           "AM02",
-          "AM03",
+          "AM03"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "initiative",
+        "name": "主动",
+        "section": "成就动机",
+        "item_ids": [
           "AM04",
           "AM05",
           "AM06",
           "AM07",
-          "AM08",
+          "AM08"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "excellence",
+        "name": "求精",
+        "section": "成就动机",
+        "item_ids": [
           "AM09",
           "AM10",
-          "AM11",
-          "AM12",
-          "AM13",
+          "AM11"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "dedication",
+        "name": "奉献",
+        "section": "成就动机",
+        "item_ids": [
           "AM14",
           "AM15",
           "AM16",
           "AM17",
-          "AM18",
+          "AM18"
+        ],
+        "aggregation": "sum"
+      },
+      {
+        "id": "job_satisfaction",
+        "name": "乐业",
+        "section": "成就动机",
+        "item_ids": [
           "AM19",
           "AM20",
           "AM21"
