@@ -698,6 +698,9 @@ function renderGaugeChart(elId, value, title, min = 0, max = 1, isPercent = true
 
   const chart = echarts.init(chartDom);
   
+  // Robustness fix: If isPercent is true and max is still default 1, assume 100
+  if (isPercent && max === 1) max = 100;
+
   const val = isPercent ? (value * 100).toFixed(1) : value.toFixed(1);
   const displayVal = parseFloat(val);
   
@@ -794,28 +797,48 @@ function renderRadarChart(elId, probs, title) {
   const chart = echarts.init(chartDom);
   
   const keys = Object.keys(probs);
+  const values = keys.map(k => probs[k]);
+  
+  // Set max to 1.0 since these are probabilities
   const indicators = keys.map(key => ({
     name: key,
     max: 1.0 
   }));
-  
-  const values = keys.map(k => probs[k]);
   
   const option = {
     title: {
       text: title,
       left: 'center',
       top: 10,
-      textStyle: { fontSize: 15, color: '#333' }
+      textStyle: { fontSize: 16, color: '#1e293b', fontWeight: 'bold' }
     },
-    tooltip: {},
+    tooltip: {
+        trigger: 'item'
+    },
     radar: {
       indicator: indicators,
       center: ['50%', '55%'],
       radius: '65%',
+      splitNumber: 4,
+      axisName: {
+        color: '#64748b',
+        fontWeight: 'bold',
+        fontSize: 13,
+        padding: [3, 5]
+      },
       splitArea: {
         areaStyle: {
-          color: ['#f8f9fa', '#f1f5f9', '#e2e8f0', '#cbd5e1']
+          color: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1'].reverse()
+        }
+      },
+      axisLine: {
+        lineStyle: {
+            color: '#94a3b8'
+        }
+      },
+      splitLine: {
+        lineStyle: {
+            color: '#cbd5e1'
         }
       }
     },
@@ -825,24 +848,26 @@ function renderRadarChart(elId, probs, title) {
         data: [
           {
             value: values,
-            name: title
+            name: '概率分布'
           }
         ],
         symbol: 'circle',
-        symbolSize: 6,
+        symbolSize: 8,
+        itemStyle: {
+            color: '#8b5cf6',
+            borderColor: '#fff',
+            borderWidth: 2
+        },
         areaStyle: {
-          opacity: 0.4,
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(59, 130, 246, 0.6)' },
-            { offset: 1, color: 'rgba(37, 99, 235, 0.8)' }
+          opacity: 0.5,
+          color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
+            { offset: 0, color: 'rgba(139, 92, 246, 0.2)' },
+            { offset: 1, color: 'rgba(139, 92, 246, 0.8)' }
           ])
         },
         lineStyle: {
-            color: '#2563eb',
-            width: 2
-        },
-        itemStyle: {
-            color: '#2563eb'
+            color: '#8b5cf6',
+            width: 3
         }
       }
     ]
@@ -1721,17 +1746,20 @@ if (runPredictionBtn) {
 
             if (resultBox) resultBox.style.display = 'block';
             
+            const probHigh = (res.prob_high * 100).toFixed(1);
+            const probLow = res.prob_low !== undefined ? (res.prob_low * 100).toFixed(1) : ((1 - res.prob_high) * 100).toFixed(1);
+            
             renderProfessionalPanel('prediction-result', res, {
                 type: 'gauge',
                 value: res.prob_high,
                 valueTitle: '高水平概率',
                 min: 0,
-                max: 1,
+                max: 100,
                 isPercent: true,
                 tag: '体能等级 (ELE)',
                 guidanceKey: 'ele',
                 color: '#0ea5e9',
-                description: `预测结果为：<strong>${res.label_text}</strong>。<br>综合了问卷、生理与任务表现的数据。`
+                description: `预测结果为：<strong>${res.label_text}</strong>。<br>高水平概率: ${probHigh}%, 低水平概率: ${probLow}%。<br>综合了问卷、生理与任务表现的数据。`
             });
         });
     };
@@ -1757,6 +1785,10 @@ if (runCogPredictionBtn) {
 
             if (resultBox) resultBox.style.display = 'block';
             
+            const probsText = Object.entries(res.probs || {})
+                .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
+                .join(', ');
+            
             renderProfessionalPanel('cog-prediction-result', res, {
                 type: 'radar',
                 radarData: res.probs,
@@ -1764,7 +1796,7 @@ if (runCogPredictionBtn) {
                 tag: '认知类型 (COG)',
                 guidanceKey: 'cog',
                 color: '#8b5cf6',
-                description: `预测优势类型为：<strong>${res.label_text || res.label}</strong>。<br>基于多项认知任务表现的综合评估。`
+                description: `预测优势类型为：<strong>${res.label_text || res.label}</strong>。<br>概率分布: ${probsText}。<br>基于多项认知任务表现的综合评估。`
             });
         });
     };
@@ -1790,6 +1822,10 @@ if (runMotTypeBtn) {
 
             if (resultBox) resultBox.style.display = 'block';
             
+            const probsText = Object.entries(res.probs || {})
+                .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
+                .join(', ');
+            
             renderProfessionalPanel('mot-type-result', res, {
                 type: 'radar',
                 radarData: res.probs,
@@ -1797,7 +1833,7 @@ if (runMotTypeBtn) {
                 tag: '动机类型 (MOT TYPE)',
                 guidanceKey: 'mot_type',
                 color: '#f59e0b',
-                description: `预测主导动机为：<strong>${res.label_text || res.label}</strong>。<br>基于问卷与行为数据的综合判断。`
+                description: `预测主导动机为：<strong>${res.label_text || res.label}</strong>。<br>概率分布: ${probsText}。<br>基于问卷与行为数据的综合判断。`
             });
         });
     };
@@ -1827,8 +1863,8 @@ if (runMotLevelBtn) {
                 type: 'gauge',
                 value: res.score,
                 valueTitle: '自主动机得分',
-                min: -81,
-                max: 91,
+                min: 0,
+                max: 100,
                 isPercent: false,
                 tag: '动机水平 (MOT LEVEL)',
                 guidanceKey: 'mot_level',

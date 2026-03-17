@@ -1,156 +1,152 @@
 import sys
 import json
 import os
-import numpy as np
-import pandas as pd
 import joblib
+import pandas as pd
+import numpy as np
 
+# Paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-MODEL_PATH = os.path.join(PROJECT_ROOT, "model", "predict_cog", "Cog_Type_HybridOvR_best_model.pkl")
+MODEL_DIR = os.path.join(PROJECT_ROOT, "model", "predict_cog")
+MODEL_PATH = os.path.join(MODEL_DIR, "cog_model_v2.joblib")
+ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoder.joblib")
+MEDIANS_PATH = os.path.join(MODEL_DIR, "feature_medians.json")
 
-# Ensure we can import HybridOvRClassifier for unpickling
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+# Feature Mapping (from predict_single_cog.py)
+FEATURE_RENAME_MAP = {
+    'Arm_MAV_EMG': 'Arm_MAV',
+    'Arm_MDF_EMG': 'Arm_MDF',
+    'Arm_MPF_EMG': 'Arm_MPF',
+    'Arm_RMS_EMG': 'Arm_RMS',
+    'Arm_iEMG_EMG': 'Arm_iEMG',
+    'Arm_Max_Amp_EMG': 'Arm_Max_Amp',
+    'Neck_MAV_EMG': 'Neck_MAV',
+    'Neck_MDF_EMG': 'Neck_MDF',
+    'Neck_MPF_EMG': 'Neck_MPF',
+    'Neck_RMS_EMG': 'Neck_RMS',
+    'Neck_iEMG_EMG': 'Neck_iEMG',
+    'Neck_Max_Amp_EMG': 'Neck_Max_Amp',
+    'blink_freq_Eye': 'blink_rate_Hz_Eye',
+    'avg_blink_dur_ms_Eye': 'blink_dur_ms_Eye',
+    'fixation_freq_Eye': 'fixation_rate_Hz_Eye',
+    'Pre_SBP_BPHR': 'sbp_pre',
+    'Pre_DBP_BPHR': 'dbp_pre',
+    'Post_SBP_BPHR': 'sbp_post',
+    'Post_DBP_BPHR': 'dbp_post'
+}
 
-try:
-    from train_best_models import HybridOvRClassifier  # noqa: F401
-except Exception:
-    try:
-        from train_domain_model import HybridOvRClassifier  # noqa: F401
-    except Exception:
-        import types
+def load_resources():
+    if not os.path.exists(MODEL_PATH) or not os.path.exists(ENCODER_PATH) or not os.path.exists(MEDIANS_PATH):
+        raise FileNotFoundError("Model, encoder or medians file not found.")
+    
+    # Use stderr for debug logs to avoid polluting stdout (JSON output)
+    print(f"DEBUG: Loading model from {MODEL_PATH}", file=sys.stderr)
+    bundle = joblib.load(MODEL_PATH)
+    # Handle bundle format vs standalone model
+    if isinstance(bundle, dict) and 'model' in bundle:
+        model = bundle['model']
+        feature_columns = bundle.get('feature_columns', [])
+    else:
+        model = bundle
+        feature_columns = getattr(model, 'feature_names_in_', [])
 
-        class HybridOvRClassifier:
-            def __init__(self, estimators_info=None, classes_=None, estimators=None):
-                self.estimators_info = estimators_info or {}
-                self.classes_ = classes_ or []
-                self.estimators = estimators or {}
+    print(f"DEBUG: Loading encoder from {ENCODER_PATH}", file=sys.stderr)
+    encoder = joblib.load(ENCODER_PATH)
+    
+    print(f"DEBUG: Loading medians from {MEDIANS_PATH}", file=sys.stderr)
+    with open(MEDIANS_PATH, 'r', encoding='utf-8') as f:
+        medians = json.load(f)
+        
+    return model, encoder, medians, feature_columns
 
-            def _get_estimator(self, key, info):
-                if isinstance(info, dict):
-                    if "estimator" in info:
-                        return info["estimator"]
-                    if "model" in info:
-                        return info["model"]
-                if hasattr(self, "estimators_") and isinstance(self.estimators_, dict) and key in self.estimators_:
-                    return self.estimators_[key]
-                if isinstance(self.estimators, dict) and key in self.estimators:
-                    return self.estimators[key]
-                return None
-
-            def _predict_score(self, est, X):
-                if hasattr(est, "predict_proba"):
-                    proba = est.predict_proba(X)
-                    if len(proba.shape) == 2 and proba.shape[1] > 1:
-                        return proba[:, 1]
-                    return proba[:, 0]
-                if hasattr(est, "decision_function"):
-                    return est.decision_function(X)
-                return est.predict(X)
-
-            def predict_proba(self, X):
-                classes = list(self.classes_) if len(self.classes_) else list(self.estimators_info.keys())
-                scores = []
-                for cls in classes:
-                    info = self.estimators_info.get(cls, {})
-                    cols = info.get("features") or info.get("feature_names") or []
-                    X_sub = X[cols] if cols else X
-                    est = self._get_estimator(cls, info)
-                    if est is None:
-                        raise ValueError(f"Missing estimator for class {cls}")
-                    score = self._predict_score(est, X_sub)
-                    score = np.array(score).reshape(-1)
-                    scores.append(score)
-                scores = np.vstack(scores).T
-                exp = np.exp(scores - np.max(scores, axis=1, keepdims=True))
-                return exp / exp.sum(axis=1, keepdims=True)
-
-        for module_name in ("train_best_models", "train_domain_model"):
-            if module_name not in sys.modules:
-                mod = types.ModuleType(module_name)
-                setattr(mod, "HybridOvRClassifier", HybridOvRClassifier)
-                sys.modules[module_name] = mod
-
-
-def load_model():
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(MODEL_PATH)
-    if HybridOvRClassifier is not None:
-        import types
-        main_mod = sys.modules.get("__main__")
-        if main_mod is not None and not hasattr(main_mod, "HybridOvRClassifier"):
-            setattr(main_mod, "HybridOvRClassifier", HybridOvRClassifier)
-    model = joblib.load(MODEL_PATH)
-    if not hasattr(model, "estimators_info"):
-        raise ValueError("Loaded model is missing estimators_info")
-    if not hasattr(model, "classes_"):
-        raise ValueError("Loaded model is missing classes_")
-    return model
-
-
-def build_row(features, needed_cols):
-    row = pd.DataFrame([np.nan] * len(needed_cols), index=needed_cols).T
+def preprocess_input(features, medians, feature_columns):
+    # 1. Rename features
+    mapped_features = {}
     for k, v in features.items():
-        if k in row.columns and v is not None:
+        new_key = FEATURE_RENAME_MAP.get(k, k)
+        mapped_features[new_key] = v
+        
+    # 2. Convert to DataFrame (single row)
+    # Initialize with NaNs
+    df = pd.DataFrame([np.nan] * len(feature_columns), index=feature_columns).T
+    
+    # 3. Fill values
+    for col in feature_columns:
+        if col in mapped_features:
+            val = mapped_features[col]
+            # Handle categorical mapping immediately
+            if col == '性别':
+                if val == '男': val = 1
+                elif val == '女': val = 0
+                else: val = np.nan # Or default?
+            elif col == '学历':
+                edu_map = {'初中': 1, '高中': 2, '中专': 2, '大专': 3, '本科': 4, '硕士': 5, '博士': 6}
+                val = edu_map.get(str(val), 3) # Default to 3 (大专) if unknown or missing
+            
             try:
-                row.at[0, k] = float(v)
-            except Exception:
-                continue
-    return row
+                df.at[0, col] = float(val)
+            except:
+                pass # Keep NaN if conversion fails
+    
+    # 4. Fill Missing Values with Medians
+    for col in feature_columns:
+        if pd.isna(df.at[0, col]):
+            if col in medians:
+                df.at[0, col] = medians[col]
+            else:
+                df.at[0, col] = 0 # Fallback
+                
+    return df
 
-
-def predict_from_features(features: dict):
+def predict(features):
     try:
-        model = load_model()
+        model, encoder, medians, feature_columns = load_resources()
+        
+        X = preprocess_input(features, medians, feature_columns)
+        
+        # Predict
+        y_pred_idx = model.predict(X)
+        y_pred_label = encoder.inverse_transform(y_pred_idx)[0]
+        y_prob = model.predict_proba(X)[0]
+        
+        # Construct probability dictionary
+        prob_dict = {}
+        for i, cls in enumerate(encoder.classes_):
+            prob_dict[str(cls)] = float(y_prob[i])
+            
+        return {
+            "ok": True,
+            "label": str(y_pred_label),
+            "label_text": str(y_pred_label),
+            "probs": prob_dict,
+            "input_features": features # Return original features for debug/display
+        }
+        
     except Exception as e:
-        return {"ok": False, "error": f"加载认知优势模型失败: {e}"}
-
-    needed_cols = set()
-    for info in getattr(model, "estimators_info", {}).values():
-        cols = info.get("features", [])
-        needed_cols.update(cols)
-    needed_cols = sorted(list(needed_cols))
-
-    input_features = {}
-    try:
-        row = build_row(features, needed_cols)
-        for c in row.columns:
-            val = row.at[0, c]
-            if pd.notna(val):
-                input_features[c] = float(val)
-
-        probas = model.predict_proba(row)[0]
-        classes = list(model.classes_)
-        idx = int(np.argmax(probas))
-        best_label = classes[idx]
-        prob_dict = {str(c): float(p) for c, p in zip(classes, probas)}
-    except Exception as e:
-        return {"ok": False, "error": f"模型预测失败: {e}"}
-
-    return {
-        "ok": True,
-        "label": best_label,
-        "label_text": best_label,
-        "probs": prob_dict,
-        "input_features": input_features,
-    }
-
+        import traceback
+        traceback.print_exc()
+        return {"ok": False, "error": f"Prediction failed: {str(e)}"}
 
 def main():
     try:
+        # Check if running interactively or via pipe
+        if sys.stdin.isatty():
+            # For testing/debugging manually
+            print("Waiting for JSON input from stdin...", file=sys.stderr)
+            
         payload = sys.stdin.read()
-        if not payload.strip():
-            raise ValueError("输入为空")
+        if not payload:
+            return
+            
         data = json.loads(payload)
         features = data.get("features", {})
+        
+        result = predict(features)
+        print(json.dumps(result, ensure_ascii=False))
+        
     except Exception as e:
-        out = {"ok": False, "error": f"解析输入失败: {e}"}
+        out = {"ok": False, "error": f"Input parsing failed: {str(e)}"}
         print(json.dumps(out, ensure_ascii=False))
-        return
-
-    out = predict_from_features(features)
-    print(json.dumps(out, ensure_ascii=False))
-
 
 if __name__ == "__main__":
     main()
