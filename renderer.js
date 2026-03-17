@@ -862,10 +862,6 @@ function renderEmgResult(d, subjectId) {
   if (grid) {
     grid.innerHTML = '';
     const m = d.metrics || {};
-    const blinkAnomalyAll = m.blink_anomaly_all === true;
-    const blinkAnomalyCount = typeof m.blink_anomaly_count === 'number' ? m.blink_anomaly_count : 0;
-    const blinkLabelSuffix = blinkAnomalyAll ? '（数据异常）' : (blinkAnomalyCount > 0 ? '（已剔除异常）' : '');
-    const blinkValue = (v) => blinkAnomalyAll ? '数据异常' : v;
     const rows = [
       ['上肢肌电平均绝对值 (μV)', m.Arm_MAV],
       ['上肢肌电中值频率 (Hz)', m.Arm_MDF],
@@ -976,6 +972,10 @@ function renderEyeResult(d, subjectId) {
   if (grid) {
     grid.innerHTML = '';
     const m = d.metrics || {};
+    const blinkAnomalyAll = m.blink_anomaly_all === true;
+    const blinkAnomalyCount = typeof m.blink_anomaly_count === 'number' ? m.blink_anomaly_count : 0;
+    const blinkLabelSuffix = blinkAnomalyAll ? '（数据异常）' : (blinkAnomalyCount > 0 ? '（已剔除异常）' : '');
+    const blinkValue = (v) => blinkAnomalyAll ? '数据异常' : v;
     
     // Add title indicating batch or single
     /*
