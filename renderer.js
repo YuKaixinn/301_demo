@@ -1519,10 +1519,10 @@ if (exportUnifiedCsvBtn) {
         await withLoading(exportUnifiedCsvBtn, async () => {
             const res = await window.api.exportUnifiedCsv();
             if (res && res.ok) {
-                showModal('导出成功 (Exported): ' + res.filePath);
+                showModal('导出成功 (Excel): ' + res.filePath);
             } else {
                 const msg = res && res.error ? res.error : '未知错误';
-                showModal('导出失败 (Export Failed): ' + msg);
+                showModal('导出失败 (Excel): ' + msg);
             }
         });
     };
@@ -1598,7 +1598,6 @@ async function handleGameImport(btnId, type) {
                 });
                 const subjectId = getGlobalSubjectId();
                 await autoSaveGameScore(subjectId);
-                showModal('导入成功 (Import Successful)');
             } else {
                 showModal('分析失败 (Analysis Failed): ' + (res.error || '未知错误'));
             }
@@ -1630,7 +1629,6 @@ if (analyzeGameBtn) {
                     });
                 }
                 await autoSaveGameScore(subjectId);
-                showModal('分析完成 (Analysis Complete)');
             } else {
                 showModal('分析失败 (Analysis Failed): ' + (res.error || '未找到数据'));
             }
@@ -1666,11 +1664,8 @@ async function loadSettings() {
         if (paths) {
             const map = {
                 'emgPathInput': paths.emg,
-                'emgDataPathInput': paths.emgDataPath,
                 'ecgPathInput': paths.ecg,
-                'ecgDataPathInput': paths.ecgDataPath,
                 'eyePathInput': paths.eye,
-                'eyeDataPathInput': paths.eyeDataPath,
                 'gameDataPathInput': paths.gameDataPath,
                 'cacheDirInput': paths.cacheDir
             };
@@ -1693,11 +1688,8 @@ loadSettings();
 
 const configBindings = [
     { btn: 'browseEmgPathBtn', input: 'emgPathInput', key: 'emg', type: 'file' },
-    { btn: 'browseEmgDataPathBtn', input: 'emgDataPathInput', key: 'emgDataPath', type: 'folder' },
     { btn: 'browseEcgPathBtn', input: 'ecgPathInput', key: 'ecg', type: 'file' },
-    { btn: 'browseEcgDataPathBtn', input: 'ecgDataPathInput', key: 'ecgDataPath', type: 'folder' },
     { btn: 'browseEyePathBtn', input: 'eyePathInput', key: 'eye', type: 'file' },
-    { btn: 'browseEyeDataPathBtn', input: 'eyeDataPathInput', key: 'eyeDataPath', type: 'folder' },
     { btn: 'browseGameDataPathBtn', input: 'gameDataPathInput', key: 'gameDataPath', type: 'folder' },
     { btn: 'browseCacheDirBtn', input: 'cacheDirInput', key: 'cacheDir', type: 'folder' }
 ];

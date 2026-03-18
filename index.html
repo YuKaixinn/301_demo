@@ -307,7 +307,7 @@
               <!-- Shooting -->
               <div style="background:#f8fafc; padding:20px; border-radius:12px; border: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">射击游戏 (game 3)</h5>
+                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">射击游戏</h5>
                   <button id="importShootingBtn" class="modern-btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">📂 导入</button>
                 </div>
                 <p style="margin: 8px 0; color: #475569;">总分: <strong id="val_shooting_total" style="color: #0f172a;">-</strong></p>
@@ -317,7 +317,7 @@
               <!-- Task 4 -->
               <div style="background:#f8fafc; padding:20px; border-radius:12px; border: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">套圈与连线 (game 4)</h5>
+                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">套圈与连线</h5>
                   <button id="importTask4Btn" class="modern-btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">📂 导入</button>
                 </div>
                 <p style="margin: 8px 0; color: #475569;">套圈分: <strong id="val_task4_ball" style="color: #0f172a;">-</strong></p>
@@ -328,7 +328,7 @@
               <!-- Game 5 -->
               <div style="background:#f8fafc; padding:20px; border-radius:12px; border: 1px solid #e2e8f0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">综合生存 (game 5)</h5>
+                  <h5 style="margin:0; color:#2563eb; font-size: 16px;">综合生存</h5>
                   <button id="importGame5Btn" class="modern-btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">📂 导入</button>
                 </div>
                 <p style="margin: 8px 0; color: #475569;">总分: <strong id="val_game5_total" style="color: #0f172a;">-</strong></p>
@@ -444,51 +444,42 @@
           <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">路径配置</h3>
           
           <div class="config-item" style="margin-top: 20px;">
-            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">EMG 软件路径：</p>
-            <div style="display: flex; gap: 12px;">
-              <input type="text" id="emgPathInput" readonly class="modern-input" style="flex: 1;">
-              <button id="browseEmgPathBtn" class="modern-btn btn-secondary">浏览...</button>
-            </div>
-            <p style="margin-bottom: 8px; margin-top: 16px; color: #4b5563; font-weight: 500; font-size: 14px;">EMG 数据输出目录：</p>
-            <div style="display: flex; gap: 12px;">
-              <input type="text" id="emgDataPathInput" readonly class="modern-input" style="flex: 1;">
-              <button id="browseEmgDataPathBtn" class="modern-btn btn-secondary">浏览...</button>
-            </div>
-          </div>
-
-          <div class="config-item" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
             <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">ECG 软件路径：</p>
             <div style="display: flex; gap: 12px;">
               <input type="text" id="ecgPathInput" readonly class="modern-input" style="flex: 1;">
               <button id="browseEcgPathBtn" class="modern-btn btn-secondary">浏览...</button>
             </div>
-            <p style="margin-bottom: 8px; margin-top: 16px; color: #4b5563; font-weight: 500; font-size: 14px;">ECG 数据输出目录：</p>
-            <div style="display: flex; gap: 12px;">
-              <input type="text" id="ecgDataPathInput" readonly class="modern-input" style="flex: 1;">
-              <button id="browseEcgDataPathBtn" class="modern-btn btn-secondary">浏览...</button>
-            </div>
+            
           </div>
 
-          <div class="config-item" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">眼动软件路径：</p>
+          <div class="config-item" style="margin-top: 24px;">
+            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">EMG 软件路径：</p>
+            <div style="display: flex; gap: 12px;">
+              <input type="text" id="emgPathInput" readonly class="modern-input" style="flex: 1;">
+              <button id="browseEmgPathBtn" class="modern-btn btn-secondary">浏览...</button>
+            </div>
+            
+          </div>
+
+          <div class="config-item" style="margin-top: 24px;">
+            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">VR 游戏软件路径：</p>
             <div style="display: flex; gap: 12px;">
               <input type="text" id="eyePathInput" readonly class="modern-input" style="flex: 1;">
               <button id="browseEyePathBtn" class="modern-btn btn-secondary">浏览...</button>
             </div>
-            <p style="margin-bottom: 8px; margin-top: 16px; color: #4b5563; font-weight: 500; font-size: 14px;">眼动数据输出目录：</p>
-            <div style="display: flex; gap: 12px;">
-              <input type="text" id="eyeDataPathInput" readonly class="modern-input" style="flex: 1;">
-              <button id="browseEyeDataPathBtn" class="modern-btn btn-secondary">浏览...</button>
-            </div>
+            
           </div>
           
-          <div class="config-item" style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">游戏文件目录：</p>
+          <div class="config-item" style="margin-top: 24px;">
+            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">游戏成绩目录：</p>
             <div style="display: flex; gap: 12px;">
               <input type="text" id="gameDataPathInput" readonly class="modern-input" style="flex: 1;">
               <button id="browseGameDataPathBtn" class="modern-btn btn-secondary">浏览...</button>
             </div>
-            <p style="margin-bottom: 8px; margin-top: 16px; color: #4b5563; font-weight: 500; font-size: 14px;">缓存目录：</p>
+          </div>
+
+          <div class="config-item" style="margin-top: 24px;">
+            <p style="margin-bottom: 8px; color: #4b5563; font-weight: 500; font-size: 14px;">缓存目录：</p>
             <div style="display: flex; gap: 12px;">
               <input type="text" id="cacheDirInput" readonly class="modern-input" style="flex: 1;">
               <button id="browseCacheDirBtn" class="modern-btn btn-secondary">浏览...</button>
@@ -499,7 +490,7 @@
         <div class="modern-card">
           <h3 style="margin-bottom: 20px; font-size: 18px; color: #333;">操作中心</h3>
           <div style="margin-top: 15px; display: flex; gap: 12px;">
-            <button id="exportUnifiedCsvBtn" class="modern-btn btn-primary">📊 导出统一 CSV</button>
+            <button id="exportUnifiedCsvBtn" class="modern-btn btn-primary">📊 导出统一 Excel</button>
             <button id="exportPdfReportBtn" class="modern-btn" style="background-color: #10b981; color: white;">📄 导出综合分析报告 (PDF)</button>
           </div>
         </div>

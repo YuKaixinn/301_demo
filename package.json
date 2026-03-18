@@ -200,7 +200,8 @@
     }
   },
   "dependencies": {
-    "echarts": "^6.0.0"
+    "echarts": "^6.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "electron": "^23.3.13",

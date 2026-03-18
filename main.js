@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const XLSX = require('xlsx');
 const { analyzeECG, analyzeEMG, analyzeEye } = require('./utils/physio_analysis');
 
 const LEGACY_DATA_ROOT = 'D:\\ccho_RECORD';
@@ -682,7 +683,11 @@ ipcMain.handle('export:unifiedCsv', async () => {
         } else if (predType === 'mot_type') {
           row.mot_type_pred = record.label;
         } else if (predType === 'mot_level') {
-          row.mot_level_pred = record.label;
+          if (record.score != null) {
+            row.mot_level_pred = record.score;
+          } else {
+            row.mot_level_pred = record.label;
+          }
         }
       }
     }
@@ -770,40 +775,36 @@ ipcMain.handle('export:unifiedCsv', async () => {
       { header: 'Game5_LifeSum_Score', key: 'Game5_LifeSum_Score' }
     ];
 
-    const escapeCsv = (value) => {
-      if (value == null) return '';
-      const s = String(value);
-      if (/[",\n]/.test(s)) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
-      return s;
-    };
-
-    const lines = [];
     const headers = columnDefs.map(col => col.header);
-    lines.push(headers.map(escapeCsv).join(','));
-    rows.forEach(r => {
-      const line = columnDefs.map(col => escapeCsv(r[col.key]));
-      lines.push(line.join(','));
-    });
+    const data = [
+      headers,
+      ...rows.map(r => columnDefs.map(col => {
+        const value = r[col.key];
+        return value == null ? '' : value;
+      }))
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '统一数据');
 
     const timestamp = getCNTimestampForFile();
     const subjectIds = Array.from(rowsBySubject.keys());
     let baseId = subjectIds.length === 1 ? subjectIds[0] : (subjectIds[0] || 'ALL');
     baseId = String(baseId || 'ALL');
-    const defaultName = `${baseId}_${timestamp}.csv`;
+    const defaultName = `${baseId}_${timestamp}.xlsx`;
 
     const { filePath } = await dialog.showSaveDialog({
       defaultPath: defaultName,
-      filters: [{ name: 'CSV', extensions: ['csv'] }]
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
     });
     if (!filePath) {
       return { ok: false, error: '用户取消导出' };
     }
-    fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
-    return { ok: true, filePath };
+    const finalPath = filePath.toLowerCase().endsWith('.xlsx') ? filePath : `${filePath}.xlsx`;
+    XLSX.writeFile(workbook, finalPath, { bookType: 'xlsx' });
+    return { ok: true, filePath: finalPath };
   } catch (e) {
-    console.error('Failed to export unified CSV:', e);
+    console.error('Failed to export unified Excel:', e);
     return { ok: false, error: String(e) };
   }
 });
@@ -1044,6 +1045,18 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         { label: 'avg_pupil_R_Eye', keys: ['avg_pupil_R_Eye'] }
     ];
 
+    const gameMetricNameMap = {
+        Shooting_TotalScore_Score: '射击任务总分 (分)',
+        Shooting_Accuracy_Score: '射击任务准确率 (比例)',
+        Shooting_AvgScore_Score: '射击任务平均分 (分)',
+        Task4_BallAndRing_Score: '套圈任务得分 (分)',
+        Task4_NumberLine_Score: '连线任务得分 (分)',
+        Task4_Total_Score: '任务4总分 (分)',
+        Task4_Accuracy_Score: '任务4准确率 (比例)',
+        Game5_TotalScore_Score: '综合生存总分 (分)',
+        Game5_LifeSum_Score: '综合生存剩余生命 (分)'
+    };
+
     const gameMetrics = [
         { label: 'Shooting_TotalScore_Score', keys: ['Shooting_TotalScore_Score'] },
         { label: 'Shooting_Accuracy_Score', keys: ['Shooting_Accuracy_Score'] },
@@ -1059,7 +1072,8 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
     const renderMetricRows = (metrics) => {
         return metrics.map(m => {
             const value = formatValue(pickFeature(m.keys));
-            return `<tr><td>${m.label}</td><td>${value}</td></tr>`;
+            const displayLabel = gameMetricNameMap[m.label] || m.label;
+            return `<tr><td>${displayLabel}</td><td>${value}</td></tr>`;
         }).join('');
     };
 
@@ -1154,6 +1168,8 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
         'Neck_iEMG': '颈部肌电积分 (μV·s)',
         'Neck_Max_Amp': '颈部肌电最大幅值 (μV)',
 
+        'duration_sec_Eye': '眼动记录时长 (秒)',
+        'sampling_rate_est_Eye': '采样率 (Hz)',
         'blink_count_Eye': '眨眼次数 (次)',
         'blink_rate_Hz_Eye': '眨眼频率 (次/分钟)',
         'blink_dur_ms_Eye': '眨眼持续时间 (ms)',
@@ -1191,9 +1207,24 @@ ipcMain.handle('export:pdfReport', async (_event, subjectIdRaw) => {
 
     const buildPhysioTablesHtml = () => {
         let html = '';
+        const eyeHiddenKeys = new Set([
+            'short_blink_count_Eye',
+            'avg_pupil_L_Eye',
+            'avg_pupil_R_Eye',
+            'L_openness',
+            'L_squeeze',
+            'gaze_yaw_std_Eye',
+            'gaze_pitch_std_Eye',
+            'blink_anomaly_count',
+            'blink_anomaly_all'
+        ]);
+        const filterMetrics = (metrics, hiddenKeys) => {
+            if (!metrics) return {};
+            return Object.fromEntries(Object.entries(metrics).filter(([key]) => !hiddenKeys.has(key)));
+        };
         html += renderMetricTable('ECG 心电指标 (ECG Metrics)', ecgRecord ? ecgRecord.metrics : {});
         html += renderMetricTable('EMG 肌电指标 (EMG Metrics)', emgRecord ? emgRecord.metrics : {});
-        html += renderMetricTable('眼动指标 (Eye Metrics)', eyeRecord ? eyeRecord.metrics : {});
+        html += renderMetricTable('眼动指标 (Eye Metrics)', filterMetrics(eyeRecord ? eyeRecord.metrics : {}, eyeHiddenKeys));
         return html;
     };
 
